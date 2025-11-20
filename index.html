@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MU: The Web Tribute</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto:wght@400;500&display=swap');
+      body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #050505;
+        color: #e0e0e0;
+        overflow: hidden;
+      }
+      .mu-font {
+        font-family: 'Cinzel', serif;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4a4a4a; 
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555; 
+      }
+      .item-glow-rare {
+        box-shadow: 0 0 10px #4ade80;
+        border-color: #4ade80;
+      }
+      .item-glow-epic {
+        box-shadow: 0 0 15px #facc15;
+        border-color: #facc15;
+        animation: pulse-gold 2s infinite;
+      }
+      @keyframes pulse-gold {
+        0% { box-shadow: 0 0 10px #facc15; }
+        50% { box-shadow: 0 0 20px #fef08a; }
+        100% { box-shadow: 0 0 10px #facc15; }
+      }
+      .damage-text {
+        animation: float-up 1s ease-out forwards;
+      }
+      @keyframes float-up {
+        0% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-50px); opacity: 0; }
+      }
+
+      /* Safe Zone Forcefield */
+      .safe-zone-dome {
+        background: radial-gradient(circle at center, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 60%, rgba(59, 130, 246, 0.4) 100%);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3), inset 0 0 30px rgba(59, 130, 246, 0.2);
+        animation: pulse-dome 4s infinite ease-in-out;
+        border-radius: 0 0 100px 0; /* Curved corner for style */
+      }
+      @keyframes pulse-dome {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Terrain */
+      .water-pattern {
+        background-color: #1e3a8a;
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);
+        animation: flow-water 10s linear infinite;
+      }
+      @keyframes flow-water {
+        from { background-position: 0 0; }
+        to { background-position: 100px 0; }
+      }
+      
+      /* Character Animations */
+      .anim-swing {
+        animation: swing 0.3s ease-out;
+        transform-origin: bottom left;
+      }
+      @keyframes swing {
+        0% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+        100% { transform: rotate(0deg); }
+      }
+      
+      /* Legendary Drop Light Pillar */
+      .light-pillar {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 400px;
+        background: linear-gradient(to top, rgba(255, 215, 0, 0.6) 0%, rgba(255, 215, 0, 0.1) 60%, transparent 100%);
+        z-index: -1;
+        pointer-events: none;
+        animation: pillar-shine 1.5s infinite alternate;
+        filter: blur(5px);
+      }
+      .light-pillar::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 400px;
+        background: rgba(255, 255, 200, 0.8);
+        filter: blur(2px);
+      }
+      @keyframes pillar-shine {
+        0% { opacity: 0.6; height: 380px; }
+        100% { opacity: 1; height: 420px; }
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
