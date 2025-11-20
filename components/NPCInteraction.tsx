@@ -44,8 +44,7 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
   // Crafting State
   const [selectedSlotA, setSelectedSlotA] = useState<Item | null>(null); // Equipment
   const [selectedSlotB, setSelectedSlotB] = useState<Item | null>(null); // Jewel
-  const [selectedSlotC, setSelectedSlotC] = useState<Item | null>(null); // Maya Jewel (for upgrade)
-
+  
   // Sell State
   const [sellRarities, setSellRarities] = useState<Rarity[]>([]);
 
@@ -55,7 +54,6 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
     setActiveTab('CHAT');
     setSelectedSlotA(null);
     setSelectedSlotB(null);
-    setSelectedSlotC(null);
     setSellRarities([]);
   };
 
@@ -144,105 +142,69 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
 
   // --- Upgrade Logic (+1 ~ +15) ---
   const getUpgradeReqs = (lvl: number) => {
+      // Current Level -> Target Level
+      // 0->1 ... 5->6 : Bless Only, 100%
       if (lvl < 6) return { bless: 1, soul: 0, maya: 0, rate: 1.0 };
-      if (lvl < 9) return { bless: 1, soul: 1, maya: 0, rate: 0.8 - ((lvl-6)*0.1) }; // 80%, 70%, 60%
-      return { bless: 1, soul: 1, maya: 1, rate: 0.5 - ((lvl-9)*0.05) }; // 50% down to 20%
+      
+      // 6->7 ... 8->9 : Bless + Soul, Decreasing Rate
+      // 6->7: 80%, 7->8: 70%, 8->9: 60%
+      if (lvl < 9) return { bless: 1, soul: 1, maya: 0, rate: 0.8 - ((lvl-6)*0.1) }; 
+      
+      // 9->10 ... 12->13+ : Bless + Soul + Maya
+      // 9->10: 50%, 10->11: 45%, etc
+      return { bless: 1, soul: 1, maya: 1, rate: Math.max(0.1, 0.5 - ((lvl-9)*0.05)) }; 
   };
 
-  const handleUpgrade = () => {
-      if (!selectedSlotA) return;
-      const currentLevel = selectedSlotA.level;
-      const reqs = getUpgradeReqs(currentLevel);
-      
-      // Check Mats
-      // Note: selectedSlotB/C are just drag targets, logic below just checks names for simplicity or we check specific slots.
-      // To keep it simple with the UI slots: Slot B = Bless/Soul, Slot C = Maya/Soul. 
-      // Let's just verify inventory has them and consume them automatically or require slots?
-      // UI shows slots. Let's enforce slots.
-      
-      if (!selectedSlotB || (reqs.soul > 0 && !selectedSlotC && reqs.maya === 0) || (reqs.maya > 0 && !selectedSlotC)) {
-          // Simplify: Just check inventory for required mats regardless of slot, 
-          // BUT for UX, let's use the slots logic:
-          // Slot B: Must be Bless
-          // Slot C: Must be Soul (if needed) or Maya (if needed)
-          // This gets complex UI wise. Let's simplify: The UI has generic "Material" slots.
-      }
-      
-      // REAL LOGIC: Just check if selected items MATCH requirements
-      let valid = true;
-      if (reqs.bless > 0 && selectedSlotB?.name !== '祝福宝石') valid = false;
-      if (reqs.soul > 0 && selectedSlotC?.name !== '灵魂宝石') valid = false;
-      if (reqs.maya > 0 && selectedSlotC?.name !== '玛雅之石') {
-          // If maya is needed, slot C must be maya. If soul is needed but not maya, slot C is soul.
-          // This implies we need dynamic slots. Let's cheat:
-          // 0-6: Slot B (Bless)
-          // 7-9: Slot B (Bless), Slot C (Soul)
-          // 10+: Slot B (Bless), Slot C (Soul), we need a 3rd slot?
-          // Let's simplify: 10+ just consumes Inventory for the 3rd item or we assume Slot C can stack?
-          // Let's just allow the button to consume from INVENTORY directly to save UI headache, 
-          // but display requirements.
-      }
-
-      // Re-implementing using "Auto-consume from Inventory" for better UX inside the function,
-      // but using the Slot B/C as visual confirmation if user put them there.
-      // Actually, let's stick to the "Put items in slots" mechanic as it's more immersive.
-      
-      // Refined Rule:
-      // Level < 6: Need Bless in Slot B.
-      // Level < 9: Need Bless (B) + Soul (C).
-      // Level >= 10: Need Bless (B) + Soul (C) + Maya (Check inventory? Or add Slot D?)
-      // Let's modify UI to show required materials text and just a "Place Equipment" slot. 
-      // Much easier and standard for web UX.
-  };
-
-  // Simplified Upgrade Handler: User puts item in Slot A. 
-  // We check inventory for mats.
   const handleUpgradeClick = () => {
       if (!selectedSlotA) return;
       const lvl = selectedSlotA.level;
+      
+      if (lvl >= 15) {
+          addLog("装备已达最高等级!", 'error');
+          return;
+      }
+
       const reqs = getUpgradeReqs(lvl);
 
       const bless = player.inventory.find(i => i.name === '祝福宝石');
       const soul = player.inventory.find(i => i.name === '灵魂宝石');
       const maya = player.inventory.find(i => i.name === '玛雅之石');
 
-      if (reqs.bless > 0 && !bless) { addLog("缺少: 祝福宝石", 'error'); return; }
-      if (reqs.soul > 0 && !soul) { addLog("缺少: 灵魂宝石", 'error'); return; }
-      if (reqs.maya > 0 && !maya) { addLog("缺少: 玛雅之石", 'error'); return; }
+      if (reqs.bless > 0 && !bless) { addLog("缺少材料: 祝福宝石", 'error'); return; }
+      if (reqs.soul > 0 && !soul) { addLog("缺少材料: 灵魂宝石", 'error'); return; }
+      if (reqs.maya > 0 && !maya) { addLog("缺少材料: 玛雅之石", 'error'); return; }
 
       // Consume Mats
       let newInv = player.inventory.filter(i => i.id !== selectedSlotA.id);
-      if (reqs.bless > 0) { 
-          const idx = newInv.findIndex(i => i.name === '祝福宝石');
-          if(idx > -1) newInv.splice(idx, 1);
-      }
-      if (reqs.soul > 0) {
-          const idx = newInv.findIndex(i => i.name === '灵魂宝石');
-          if(idx > -1) newInv.splice(idx, 1);
-      }
-      if (reqs.maya > 0) {
-          const idx = newInv.findIndex(i => i.name === '玛雅之石');
-          if(idx > -1) newInv.splice(idx, 1);
-      }
+      
+      // Helper to remove one instance of item
+      const consume = (inv: Item[], name: string) => {
+          const idx = inv.findIndex(i => i.name === name);
+          if (idx > -1) inv.splice(idx, 1);
+      };
+
+      if (reqs.bless > 0) consume(newInv, '祝福宝石');
+      if (reqs.soul > 0) consume(newInv, '灵魂宝石');
+      if (reqs.maya > 0) consume(newInv, '玛雅之石');
 
       const success = Math.random() < reqs.rate;
       let resultItem = { ...selectedSlotA };
 
       if (success) {
           resultItem.level += 1;
-          addLog(`强化成功! +${resultItem.level}`, 'level');
-          playDing(); // Reuse sound
+          addLog(`强化成功! 装备升级为 +${resultItem.level}`, 'level');
+          playDing();
       } else {
-          addLog(`强化失败! 材料消失，装备等级保持 +${resultItem.level}`, 'error');
+          addLog(`强化失败! 材料消失，装备保持 +${resultItem.level}`, 'error');
+          playFailSound();
       }
 
       newInv.push(resultItem);
       onUpdatePlayer({ ...player, inventory: newInv });
-      setSelectedSlotA(null); // Reset to prevent spamming
+      setSelectedSlotA(null); 
   };
   
   const playDing = () => {
-      // Simple inline beep for success
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -254,6 +216,21 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.5);
+  };
+
+  const playFailSound = () => {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(50, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
   };
 
   // --- Sell Logic ---
@@ -374,7 +351,7 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
                     <div className="w-1/2 bg-[#050505] flex flex-col items-center justify-center border-r border-[#333] relative p-4">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] opacity-50"></div>
                         
-                        <h3 className="text-purple-500 font-bold mb-4 z-10">装备强化 (+1~+15)</h3>
+                        <h3 className="text-purple-500 font-bold mb-4 z-10">装备强化系统</h3>
                         
                         <div 
                             className="w-24 h-24 border-2 border-purple-900 bg-black/80 flex items-center justify-center cursor-pointer relative z-10 mb-2 shadow-[0_0_20px_rgba(120,0,255,0.2)]"
@@ -383,32 +360,57 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
                              {selectedSlotA ? (
                                 <div className="flex flex-col items-center animate-pulse">
                                     <span className="text-4xl">{selectedSlotA.icon}</span>
-                                    <span className="text-xs mt-1">+{selectedSlotA.level}</span>
+                                    <span className="text-xs mt-1 text-purple-300">+{selectedSlotA.level}</span>
                                 </div>
-                             ) : <span className="text-gray-700">放入装备</span>}
+                             ) : <span className="text-gray-700 text-xs">点击选择装备</span>}
                         </div>
 
-                        {selectedSlotA && (
-                            <div className="z-10 text-center mb-4">
-                                <div className="text-xs text-gray-400 mb-1">需要材料:</div>
-                                <div className="text-xs text-blue-300">{selectedSlotA.level < 6 ? '祝福宝石 x1' : selectedSlotA.level < 9 ? '祝福 x1 + 灵魂 x1' : '祝福 x1 + 灵魂 x1 + 玛雅 x1'}</div>
-                                <div className="text-xs text-green-400 mt-1">成功率: {(getUpgradeReqs(selectedSlotA.level).rate * 100).toFixed(0)}%</div>
+                        {selectedSlotA ? (
+                            <div className="z-10 text-center mb-4 bg-black/60 p-2 rounded border border-purple-900/50">
+                                <div className="text-xs text-gray-400 mb-1 border-b border-gray-700 pb-1">升级需求 (+{selectedSlotA.level} → +{selectedSlotA.level + 1})</div>
+                                <div className="flex flex-col gap-1 mt-1">
+                                    {selectedSlotA.level < 6 && <span className="text-xs text-cyan-300">💎 祝福宝石 x1</span>}
+                                    {selectedSlotA.level >= 6 && selectedSlotA.level < 9 && (
+                                        <>
+                                            <span className="text-xs text-cyan-300">💎 祝福宝石 x1</span>
+                                            <span className="text-xs text-pink-300">🔮 灵魂宝石 x1</span>
+                                        </>
+                                    )}
+                                    {selectedSlotA.level >= 9 && (
+                                        <>
+                                            <span className="text-xs text-cyan-300">💎 祝福宝石 x1</span>
+                                            <span className="text-xs text-pink-300">🔮 灵魂宝石 x1</span>
+                                            <span className="text-xs text-blue-400">💠 玛雅之石 x1</span>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="text-xs text-green-400 mt-2 font-bold">
+                                    成功率: {(getUpgradeReqs(selectedSlotA.level).rate * 100).toFixed(0)}%
+                                </div>
                             </div>
+                        ) : (
+                             <div className="z-10 text-center mb-4 p-2 text-[10px] text-gray-500">
+                                 <p>+1~+6: 100% (祝福)</p>
+                                 <p>+7~+9: 概率成功 (祝福+灵魂)</p>
+                                 <p>+10~+13: 概率成功 (祝福+灵魂+玛雅)</p>
+                             </div>
                         )}
 
                         <button 
                             disabled={!selectedSlotA}
                             onClick={handleUpgradeClick}
-                            className="z-10 bg-purple-900 hover:bg-purple-700 disabled:opacity-20 disabled:cursor-not-allowed text-white border border-purple-500 px-6 py-2 rounded font-bold"
+                            className="z-10 bg-gradient-to-b from-purple-900 to-purple-950 hover:from-purple-700 hover:to-purple-800 disabled:opacity-20 disabled:cursor-not-allowed text-white border border-purple-500 px-8 py-2 rounded font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]"
                         >
                             开始强化
                         </button>
-                        <p className="z-10 text-[10px] text-gray-500 mt-4 text-center">失败时材料消失<br/>装备等级和属性不降级</p>
+                        <p className="z-10 text-[10px] text-gray-400 mt-4 text-center bg-black/40 p-1 rounded">
+                            <span className="text-red-400 font-bold">!</span> 失败时材料消失，装备不降级
+                        </p>
                     </div>
 
                     {/* Right: Inventory */}
                     <div className="w-1/2 p-2 bg-[#111] overflow-y-auto">
-                         <div className="text-xs text-gray-400 mb-2 text-center">点击选择要强化的装备</div>
+                         <div className="text-xs text-gray-400 mb-2 text-center">选择要强化的装备</div>
                          <div className="grid grid-cols-4 gap-1">
                             {player.inventory.filter(i => i.type !== ItemType.JEWEL).map((item, i) => (
                                 <div key={i} 
@@ -423,6 +425,21 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
                                     <span className="absolute top-0 right-0 text-[8px] bg-black/80 px-1 text-white">+{item.level}</span>
                                 </div>
                             ))}
+                         </div>
+                         
+                         <div className="mt-4 text-xs text-gray-400 mb-2 text-center border-t border-gray-800 pt-2">持有材料</div>
+                         <div className="flex justify-center gap-2">
+                             {['祝福宝石', '灵魂宝石', '玛雅之石'].map(name => {
+                                 const count = player.inventory.filter(i => i.name === name).length;
+                                 const icon = name === '祝福宝石' ? '💎' : name === '灵魂宝石' ? '🔮' : '💠';
+                                 return (
+                                     <div key={name} className="flex flex-col items-center bg-black border border-gray-800 p-1 rounded w-16">
+                                         <span className="text-lg">{icon}</span>
+                                         <span className="text-[10px] text-gray-400">{name.slice(0,2)}</span>
+                                         <span className="text-xs font-bold text-white">x{count}</span>
+                                     </div>
+                                 )
+                             })}
                          </div>
                     </div>
                  </div>

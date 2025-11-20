@@ -18,7 +18,8 @@ const SPEED = 5;
 // Returns the value increased by 10% per level
 const getScaledStat = (baseVal: number | undefined, level: number) => {
     if (!baseVal) return 0;
-    return Math.floor(baseVal * (1 + level * 0.1));
+    // Using ceil to ensure small base stats still get +1 per level visibly
+    return Math.ceil(baseVal * (1 + level * 0.1));
 };
 
 // --- Audio Helper ---
@@ -80,8 +81,7 @@ const generateLoot = (monsterLevel: number, isElite: boolean, minRarity?: Rarity
   let baseItem: any;
   if (isJewel) {
      const jewels = ITEMS_DB.filter(i => i.type === ItemType.JEWEL);
-     // Weight specific jewels? Random for now.
-     // Maya is rare? 
+     // Randomly pick Bless, Soul or Maya (Chaos)
      baseItem = jewels[Math.floor(Math.random() * jewels.length)];
   } else {
      const gear = ITEMS_DB.filter(i => i.type !== ItemType.JEWEL);
@@ -200,7 +200,7 @@ const calculateStats = (player: Player) => {
 // --- Helper: Map Generation ---
 interface MapDecoration {
   id: string;
-  type: 'tree' | 'stone' | 'river' | 'grass';
+  type: 'tree' | 'stone' | 'river' | 'grass' | 'snow' | 'lava' | 'cloud';
   x: number;
   y: number;
   w: number;
@@ -211,37 +211,49 @@ interface MapDecoration {
 const generateMapDecorations = (mapId: number): MapDecoration[] => {
   const decorations: MapDecoration[] = [];
   
+  // Rivers/Lava
   for (let i = 0; i < WORLD_WIDTH; i += 20) {
     if (i > SAFE_ZONE_WIDTH + 100) { 
         const riverY = 400 + Math.sin(i / 100) * 100;
         decorations.push({
-            id: `river-${i}`, type: 'river', x: i, y: riverY, w: 25, h: 25
+            id: `fluid-${i}`, 
+            type: mapId === 4 ? 'lava' : 'river', 
+            x: i, 
+            y: riverY, 
+            w: 25, 
+            h: 25
         });
     }
   }
 
-  const numObjects = 30;
+  const numObjects = 40;
   for (let i = 0; i < numObjects; i++) {
     const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
     if (x < SAFE_ZONE_WIDTH && y < SAFE_ZONE_HEIGHT) continue;
 
-    const isStone = Math.random() > 0.7;
+    let type: MapDecoration['type'] = 'tree';
+    if (mapId === 2) type = Math.random() > 0.5 ? 'snow' : 'stone'; // Devias
+    else if (mapId === 4) type = 'stone'; // Lost Tower
+    else if (mapId === 5) type = 'cloud'; // Icarus
+    else type = Math.random() > 0.6 ? 'stone' : 'tree'; // General
+
     decorations.push({
         id: `dec-${i}`,
-        type: isStone ? 'stone' : 'tree',
+        type,
         x, y,
-        w: isStone ? 30 : 60,
-        h: isStone ? 30 : 80,
+        w: type === 'stone' ? 30 : type === 'cloud' ? 80 : 60,
+        h: type === 'stone' ? 30 : type === 'cloud' ? 40 : 80,
         style: { opacity: 0.9 }
     });
   }
   
-  for (let i=0; i < 50; i++) {
+  // Ground details
+  for (let i=0; i < 60; i++) {
      const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
     decorations.push({
-        id: `grass-${i}`, type: 'grass', x, y, w: 20, h: 20
+        id: `ground-${i}`, type: 'grass', x, y, w: 20, h: 20
     });
   }
 
@@ -346,21 +358,32 @@ const PlayerAvatar = ({ player, isAttacking }: { player: Player, isAttacking: bo
 
 // --- Tooltip Component ---
 const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, comparisonItem: Item | null, x: number, y: number, location: string }) => {
-    const getDiff = (val: number | undefined, compVal: number | undefined) => {
-        const v1 = val || 0;
-        const v2 = compVal || 0;
-        return v1 - v2;
-    };
+    const renderStatRow = (label: string, baseVal: number | undefined, level: number, compBaseVal: number | undefined, compLevel: number, colorClass: string = 'text-white') => {
+        if (!baseVal) return null;
+        
+        // Current Item Stats
+        const currentVal = getScaledStat(baseVal, level);
+        
+        // Comparison Item Stats (if any)
+        const compVal = compBaseVal ? getScaledStat(compBaseVal, compLevel) : 0;
+        
+        const bonus = currentVal - baseVal;
+        const diff = comparisonItem ? currentVal - compVal : 0;
 
-    const renderStatRow = (label: string, val: number | undefined, compVal: number | undefined, colorClass: string = 'text-white', showDiff: boolean = true) => {
-        if (!val) return null;
-        // Diff must compare Scaled vs Scaled
-        const diff = (showDiff && comparisonItem) ? getDiff(val, compVal) : 0;
         return (
-            <div className={`text-xs ${colorClass} flex justify-between`}>
-                <span>{label}: {val}</span>
-                {showDiff && comparisonItem && diff !== 0 && (
-                    <span className={diff > 0 ? 'text-green-400' : 'text-red-400'}>
+            <div className={`text-xs ${colorClass} flex justify-between items-center gap-4`}>
+                <div className="flex items-center gap-1">
+                    <span className="text-gray-400">{label}:</span>
+                    <span className="font-bold">{currentVal}</span>
+                    {/* Show scaling breakdown if item is leveled up */}
+                    {level > 0 && bonus > 0 && (
+                        <span className="text-[9px] text-gray-500">
+                            ({baseVal}<span className="text-green-700">+{bonus}</span>)
+                        </span>
+                    )}
+                </div>
+                {comparisonItem && diff !== 0 && (
+                    <span className={diff > 0 ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
                         {diff > 0 ? '+' : ''}{diff}
                     </span>
                 )}
@@ -371,29 +394,23 @@ const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, com
     const renderCard = (itm: Item, title: string, isComparison: boolean = false) => {
         const compForDiff = isComparison ? null : comparisonItem;
         
-        // Pre-calculate scaled stats for display
-        const sMin = getScaledStat(itm.stats.minDmg, itm.level);
-        const sMax = getScaledStat(itm.stats.maxDmg, itm.level);
-        const sDef = getScaledStat(itm.stats.defense, itm.level);
-        
-        const cMin = compForDiff ? getScaledStat(compForDiff.stats.minDmg, compForDiff.level) : 0;
-        const cMax = compForDiff ? getScaledStat(compForDiff.stats.maxDmg, compForDiff.level) : 0;
-        const cDef = compForDiff ? getScaledStat(compForDiff.stats.defense, compForDiff.level) : 0;
-
         return (
-            <div className="bg-black border-2 border-amber-700 p-2 w-56 shadow-2xl relative z-[100] pointer-events-none">
+            <div className="bg-black/95 border-2 border-amber-700 p-2 w-64 shadow-[0_0_15px_rgba(0,0,0,1)] relative z-[100] pointer-events-none rounded">
                 <div className="absolute -top-3 left-2 bg-black px-1 text-[10px] text-gray-500 border border-gray-800">{title}</div>
-                <div className={`font-bold ${RARITY_COLORS[itm.rarity].split(' ')[0]} border-b border-gray-700 pb-1 mb-1 break-words`}>
-                    {itm.name} {itm.level > 0 && `+${itm.level}`}
+                <div className={`font-bold text-sm ${RARITY_COLORS[itm.rarity].split(' ')[0]} border-b border-gray-700 pb-1 mb-1 break-words flex justify-between`}>
+                    <span>{itm.name}</span>
+                    {itm.level > 0 && <span className="text-amber-400">+{itm.level}</span>}
                 </div>
-                <div className="text-[10px] text-gray-400 italic mb-2 flex justify-between">
+                <div className="text-[10px] text-gray-500 italic mb-2 flex justify-between">
                     <span>{itm.type}</span>
                     <span>{itm.rarity}</span>
                 </div>
                 
-                {renderStatRow("攻击力", sMin, cMin, 'text-white', !isComparison)}
-                {renderStatRow("防御力", sDef, cDef, 'text-white', !isComparison)}
-                {itm.stats.reqStr && <div className="text-[10px] text-red-300">需要力量: {itm.stats.reqStr}</div>}
+                <div className="space-y-0.5">
+                    {renderStatRow("攻击力", itm.stats.minDmg, itm.level, compForDiff?.stats.minDmg, compForDiff?.level || 0)}
+                    {renderStatRow("防御力", itm.stats.defense, itm.level, compForDiff?.stats.defense, compForDiff?.level || 0)}
+                    {itm.stats.reqStr && <div className="text-[10px] text-red-300 mt-1">需要力量: {itm.stats.reqStr}</div>}
+                </div>
                 
                 {itm.options.length > 0 && <div className="mt-2 pt-1 border-t border-gray-700 space-y-0.5">
                     {itm.options.filter(o => o.type !== 'synthesis').map((opt, idx) => (
@@ -419,7 +436,7 @@ const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, com
     };
 
     return (
-        <div className="fixed z-[100] pointer-events-none flex gap-2 items-start" style={{ left: Math.min(window.innerWidth - 500, x + 15), top: Math.min(window.innerHeight - 300, y + 15) }}>
+        <div className="fixed z-[100] pointer-events-none flex gap-2 items-start" style={{ left: Math.min(window.innerWidth - 550, x + 15), top: Math.min(window.innerHeight - 300, y + 15) }}>
             {comparisonItem && renderCard(comparisonItem, "已装备", true)}
             {renderCard(item, getLocationLabel(location))}
         </div>
@@ -548,7 +565,7 @@ export default function App() {
 
   const tryAutoPickup = useCallback(() => {
     if (!player) return;
-    const pickupRange = 150;
+    const pickupRange = 300; // Significantly increased pickup range
     const itemsToPickup = groundItems.filter(item => {
       const dx = item.x - player.x;
       const dy = item.y - player.y;
@@ -897,6 +914,15 @@ export default function App() {
   if (!player) return null;
   const currentMap = MAPS[activeMap];
 
+  // Map Background Logic
+  let mapClass = '';
+  if (activeMap === 1) mapClass = 'bg-grass-pattern';
+  else if (activeMap === 2) mapClass = 'bg-snow-pattern';
+  else if (activeMap === 3) mapClass = 'bg-stone-pattern';
+  else if (activeMap === 4) mapClass = 'bg-lava-pattern';
+  else if (activeMap === 5) mapClass = 'bg-sky-pattern';
+  else mapClass = 'bg-[#0c0a09]'; // Default Lorencia/Dark
+
   const getComparisonItem = (hoverItem: Item): Item | null => {
       if (!hoverItem) return null;
       const eq = player.equipment;
@@ -926,18 +952,20 @@ export default function App() {
       </div>
 
       <div className="flex-1 relative overflow-hidden bg-black cursor-crosshair select-none">
-         <div className={`absolute inset-0 ${currentMap.bg}`} style={{ 
-            backgroundImage: activeMap === 1 ? `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230f392b' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` : 
-                             activeMap === 2 ? `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V4h20V2H0V0h20v20.5zm20 0V18H20v-2h20v-2H20v-2h20v-2H20V8h20V6H20V4h20V2H20V0h20v20.5z' fill='%233b82f6' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E")` : 
-                             `url("https://www.transparenttextures.com/patterns/dark-stone.png")`,
-            backgroundSize: '200px'
-         }} />
+         <div className={`absolute inset-0 ${mapClass}`} />
+         <div className="map-vignette" />
+         
+         {/* Added Fog/Noise overlay for beautification */}
+         <div className="absolute inset-0 opacity-10 pointer-events-none z-[1] mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
 
          {mapDecorations.map(dec => {
              if (dec.type === 'river') return <div key={dec.id} className="absolute water-pattern rounded-full opacity-60 blur-sm" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }} />
-             if (dec.type === 'tree') return <div key={dec.id} className="absolute flex flex-col items-center justify-end" style={{ left: dec.x, top: dec.y }}><div className="w-12 h-24 bg-green-900 rounded-t-full opacity-80 border-b-4 border-black shadow-2xl"></div><div className="w-4 h-4 bg-amber-900"></div></div>
-             if (dec.type === 'stone') return <div key={dec.id} className="absolute bg-gray-700 rounded-lg border-2 border-gray-500" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '2px 2px 5px black' }}></div>
-             if (dec.type === 'grass') return <div key={dec.id} className="absolute text-green-800 text-xs opacity-50" style={{ left: dec.x, top: dec.y }}>🌱</div>
+             if (dec.type === 'lava') return <div key={dec.id} className="absolute bg-red-600 rounded-full opacity-60 blur-md animate-pulse" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '0 0 20px red' }} />
+             if (dec.type === 'tree') return <div key={dec.id} className="absolute flex flex-col items-center justify-end z-[2]" style={{ left: dec.x, top: dec.y }}><div className="w-12 h-24 bg-green-900 rounded-t-full opacity-80 border-b-4 border-black shadow-2xl"></div><div className="w-4 h-4 bg-amber-900"></div></div>
+             if (dec.type === 'stone') return <div key={dec.id} className="absolute bg-gray-700 rounded-lg border-2 border-gray-500 z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '2px 2px 5px black' }}></div>
+             if (dec.type === 'snow') return <div key={dec.id} className="absolute bg-slate-200 rounded-full blur-[1px] z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, opacity: 0.8 }}></div>
+             if (dec.type === 'cloud') return <div key={dec.id} className="absolute bg-white rounded-full blur-xl opacity-20 z-[5]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
+             if (dec.type === 'grass') return <div key={dec.id} className={`absolute text-xs opacity-50 z-[1] ${activeMap === 1 ? 'text-green-600' : activeMap === 2 ? 'text-white' : 'text-gray-600'}`} style={{ left: dec.x, top: dec.y }}>{activeMap === 2 ? '❄️' : '🌱'}</div>
              return null;
          })}
 
@@ -947,17 +975,23 @@ export default function App() {
 
          <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
             {groundItems.map(item => (
-              <div key={item.id} className="absolute flex flex-col items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform" style={{ left: item.x, top: item.y, width: ITEM_SIZE, height: ITEM_SIZE }} onClick={() => pickUpItem(item)} onMouseEnter={(e) => setHoveredItem({ item, x: e.clientX, y: e.clientY, location: 'GROUND' })} onMouseLeave={() => setHoveredItem(null)}>
+              <div key={item.id} className="absolute flex flex-col items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform z-[3]" style={{ left: item.x, top: item.y, width: ITEM_SIZE, height: ITEM_SIZE }} onClick={() => pickUpItem(item)} onMouseEnter={(e) => setHoveredItem({ item, x: e.clientX, y: e.clientY, location: 'GROUND' })} onMouseLeave={() => setHoveredItem(null)}>
                 {item.rarity === Rarity.GOLD && <div className="light-pillar"></div>}
                 <span className={`text-xl animate-bounce ${item.rarity === Rarity.GOLD ? 'drop-shadow-[0_0_5px_rgba(255,215,0,0.8)]' : ''}`}>{item.icon}</span>
                 <span className={`text-[9px] font-bold px-1 bg-black/50 rounded whitespace-nowrap ${RARITY_COLORS[item.rarity].split(' ')[0]}`}>{item.name}</span>
               </div>
             ))}
             {monsters.map(m => (
-              <div key={m.id} className="absolute flex flex-col items-center transition-all duration-100" style={{ left: m.x, top: m.y, width: m.width, height: m.height }}>
-                 <div className="w-full h-1 bg-red-900 border border-black mb-1"><div className="h-full bg-red-500" style={{ width: `${(m.hp/m.maxHp)*100}%` }}></div></div>
+              <div key={m.id} className="absolute flex flex-col items-center transition-all duration-100 z-[4]" style={{ left: m.x, top: m.y, width: m.width, height: m.height }}>
+                 {/* Improved Health Bar: Bigger, on top, clear text */}
+                 <div className="absolute -top-4 w-[120%] left-[-10%] h-3 bg-black border border-gray-500 rounded overflow-hidden shadow-sm">
+                    <div className="h-full bg-gradient-to-r from-red-600 to-red-800 transition-all duration-200" style={{ width: `${(m.hp/m.maxHp)*100}%` }}></div>
+                    <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] leading-none">
+                        {m.hp}/{m.maxHp}
+                    </span>
+                 </div>
                  <div className={`text-3xl ${m.isBoss ? 'scale-150 filter drop-shadow-[0_0_15px_rgba(255,0,0,1)]' : m.isElite ? 'scale-125 filter drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]' : ''}`}>{m.image}</div>
-                 <span className={`text-[10px] font-bold whitespace-nowrap ${m.isBoss ? 'text-red-600 text-lg' : m.isElite ? 'text-yellow-500' : 'text-red-400'}`}>{m.name}</span>
+                 <span className={`text-[10px] font-bold whitespace-nowrap drop-shadow-md ${m.isBoss ? 'text-red-500 text-lg mt-1' : m.isElite ? 'text-yellow-400' : 'text-gray-300'}`}>{m.name}</span>
               </div>
             ))}
             <div className="absolute transition-all duration-75 z-20" style={{ left: player.x, top: player.y, width: player.width, height: player.height }}>
@@ -965,7 +999,7 @@ export default function App() {
                <PlayerAvatar player={player} isAttacking={isAttacking} />
             </div>
             {floatingTexts.map(ft => (
-              <div key={ft.id} className={`absolute damage-text ${ft.color}`} style={{ left: ft.x, top: ft.y }}>{ft.text}</div>
+              <div key={ft.id} className={`absolute damage-text ${ft.color} z-[100]`} style={{ left: ft.x, top: ft.y }}>{ft.text}</div>
             ))}
          </div>
       </div>
