@@ -27,19 +27,22 @@ const NPCs = [
     features: ['CHAT', 'SYNTHESIS', 'UPGRADE']
   },
   { 
-    name: '老板娘莉雅', 
+    name: '老板娘雅丽', 
     role: 'Barmaid', 
-    greeting: '旅行者，来一杯冰镇啤酒解解乏吗？',
-    features: ['CHAT', 'SELL']
+    greeting: '旅行者，来一杯冰镇啤酒解解乏吗？或者想改个响亮的名字？',
+    features: ['CHAT', 'SELL', 'RENAME']
   }
 ];
 
 const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpdatePlayer, addLog, onHoverItem }) => {
   const [selectedNPC, setSelectedNPC] = useState(NPCs[0]);
-  const [activeTab, setActiveTab] = useState<'CHAT' | 'DISMANTLE' | 'SYNTHESIS' | 'SELL' | 'UPGRADE'>('CHAT');
+  const [activeTab, setActiveTab] = useState<'CHAT' | 'DISMANTLE' | 'SYNTHESIS' | 'SELL' | 'UPGRADE' | 'RENAME'>('CHAT');
   const [chatHistory, setChatHistory] = useState<{role: 'user'|'npc', text: string}[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Rename State
+  const [newName, setNewName] = useState('');
   
   // Crafting State
   const [selectedSlotA, setSelectedSlotA] = useState<Item | null>(null); // Equipment
@@ -55,6 +58,7 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
     setSelectedSlotA(null);
     setSelectedSlotB(null);
     setSellRarities([]);
+    setNewName('');
   };
 
   const handleSend = async () => {
@@ -66,6 +70,20 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
     const response = await generateNPCResponse(selectedNPC.name, player.class, player.level, userMsg);
     setChatHistory(prev => [...prev, { role: 'npc', text: response }]);
     setLoading(false);
+  };
+
+  // --- Rename Logic ---
+  const handleRename = () => {
+      const cost = 1000;
+      if (!newName.trim()) return;
+      if (player.zen < cost) {
+          addLog("金币不足，无法改名！", 'error');
+          return;
+      }
+      
+      onUpdatePlayer({ ...player, name: newName.trim(), zen: player.zen - cost });
+      addLog(`改名成功！你现在叫 ${newName.trim()}`, 'info');
+      setNewName('');
   };
 
   // --- Dismantle Logic ---
@@ -308,6 +326,9 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
             {selectedNPC.features.includes('SELL') && (
                 <button onClick={() => setActiveTab('SELL')} className={`px-3 py-1 text-sm font-bold whitespace-nowrap ${activeTab === 'SELL' ? 'text-yellow-400 underline' : 'text-gray-500'}`}>批量出售</button>
             )}
+            {selectedNPC.features.includes('RENAME') && (
+                <button onClick={() => setActiveTab('RENAME')} className={`px-3 py-1 text-sm font-bold whitespace-nowrap ${activeTab === 'RENAME' ? 'text-pink-400 underline' : 'text-gray-500'}`}>角色改名</button>
+            )}
         </div>
 
         {/* Content Area */}
@@ -341,6 +362,49 @@ const NPCInteraction: React.FC<NPCInteractionProps> = ({ player, onClose, onUpda
                         />
                         <button onClick={handleSend} disabled={loading} className="bg-amber-700 hover:bg-amber-600 text-white px-4 py-2 rounded text-sm font-bold">发送</button>
                     </div>
+                </div>
+            )}
+
+            {/* RENAME TAB */}
+            {activeTab === 'RENAME' && (
+                <div className="flex flex-col items-center justify-center h-full w-full bg-[#080808] p-8 relative">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')] opacity-50"></div>
+                    <h3 className="text-pink-500 font-bold text-xl mb-6 z-10">角色改名服务</h3>
+                    
+                    <div className="bg-[#111] p-6 rounded border border-pink-900/30 w-full max-w-md flex flex-col gap-4 z-10 shadow-2xl">
+                        <div className="flex justify-between items-center text-gray-400 text-sm">
+                            <span>当前名称:</span>
+                            <span className="text-white font-bold text-lg">{player.name}</span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs text-gray-500">新名称</label>
+                            <input 
+                                type="text" 
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="输入新名字"
+                                className="bg-black border border-gray-600 p-3 text-white focus:border-pink-500 outline-none rounded text-center text-lg"
+                                maxLength={12}
+                            />
+                        </div>
+
+                        <div className="flex justify-between items-center border-t border-gray-800 pt-4 mt-2">
+                            <span className="text-yellow-500 font-mono">费用: 1,000 G</span>
+                            <button 
+                                onClick={handleRename}
+                                className="bg-pink-900 hover:bg-pink-700 border border-pink-500 text-white px-6 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                disabled={!newName.trim() || player.zen < 1000}
+                            >
+                                确认修改
+                            </button>
+                        </div>
+                        
+                        {player.zen < 1000 && (
+                            <div className="text-red-500 text-xs text-center bg-red-900/20 p-1 rounded">金币不足</div>
+                        )}
+                    </div>
+                    <p className="text-gray-600 text-xs mt-4 z-10 italic">"新的名字，新的开始..."</p>
                 </div>
             )}
 
