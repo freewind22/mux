@@ -1,8 +1,17 @@
-
 import { ClassType, Monster, Item, ItemType, Rarity, Skill } from './types';
 
 export const SAFE_ZONE_WIDTH = 300;
 export const SAFE_ZONE_HEIGHT = 300;
+
+// Expanded World Size
+export const WORLD_WIDTH = 4000;
+export const WORLD_HEIGHT = 4000;
+
+// New Central Town Config for Lorencia (Centered in 4000x4000 world)
+export const TOWN_CENTER_X = 2000;
+export const TOWN_CENTER_Y = 2000;
+export const TOWN_WIDTH = 400;
+export const TOWN_HEIGHT = 350;
 
 // Stats now reflect: Str, Agi, Vit, Int (Energy mapped to Int)
 export const INITIAL_STATS = {
@@ -59,7 +68,7 @@ export const INVENTORY_PAGE_SIZE = 80;
 export const MAX_INVENTORY_PAGES = 3;
 export const MAX_INVENTORY_SIZE = INVENTORY_PAGE_SIZE * MAX_INVENTORY_PAGES;
 
-export const MONSTERS_DB: Omit<Monster, 'id' | 'hp' | 'x' | 'y' | 'width' | 'height' | 'lastAttack' | 'isElite'>[] = [
+export const MONSTERS_DB: Omit<Monster, 'id' | 'hp' | 'x' | 'y' | 'width' | 'height' | 'lastAttack' | 'isElite' | 'originX' | 'originY'>[] = [
   { name: '蜘蛛', level: 1, maxHp: 30, minDmg: 1, maxDmg: 3, exp: 15, image: '🕷️' },
   { name: '猎犬怪', level: 5, maxHp: 80, minDmg: 5, maxDmg: 10, exp: 35, image: '🐕' },
   { name: '蛮牛怪', level: 10, maxHp: 160, minDmg: 12, maxDmg: 20, exp: 80, image: '🐂' },
@@ -104,7 +113,7 @@ export const ITEMS_DB: Omit<Item, 'id' | 'level' | 'rarity' | 'options'>[] = [
   // Accessories
   { name: '雷之项链', type: ItemType.NECKLACE, stats: { minDmg: 5 }, icon: '📿' },
   { name: '冰之戒指', type: ItemType.RING, stats: { defense: 5 }, icon: '💍' },
-  { name: '卓越戒指', type: ItemType.RING, stats: { defense: 10, minDmg: 5 }, icon: '💎' },
+  { name: '卓越戒指', type: ItemType.RING, stats: { defense: 10, minDmg: 5 }, icon: '💍' },
 
   // Wings
   { name: '恶魔之翼', type: ItemType.WING, stats: { defense: 30, minDmg: 10 }, icon: '🦇' },

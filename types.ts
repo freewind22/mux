@@ -73,6 +73,10 @@ export interface Monster extends Entity {
   lastAttack: number;
   isElite: boolean; 
   isBoss?: boolean; // New property for 1% boss chance
+  // AI & Respawn Properties
+  originX: number;
+  originY: number;
+  respawnTime?: number; // Timestamp when it should respawn
 }
 
 export interface Skill {

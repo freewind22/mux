@@ -3,22 +3,23 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import GameHUD from './components/GameHUD';
 import NPCInteraction from './components/NPCInteraction';
 import { DraggableWindow } from './components/DraggableWindow';
-import { INITIAL_STATS, MONSTERS_DB, ITEMS_DB, MAPS, SKILLS, RARITY_COLORS, ITEM_OPTIONS_POOL, EXCELLENT_OPTIONS_POOL, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, INVENTORY_PAGE_SIZE, MAX_INVENTORY_PAGES, MAX_INVENTORY_SIZE } from './constants';
+import { INITIAL_STATS, MONSTERS_DB, ITEMS_DB, MAPS, SKILLS, RARITY_COLORS, ITEM_OPTIONS_POOL, EXCELLENT_OPTIONS_POOL, SAFE_ZONE_WIDTH, SAFE_ZONE_HEIGHT, INVENTORY_PAGE_SIZE, MAX_INVENTORY_PAGES, MAX_INVENTORY_SIZE, TOWN_CENTER_X, TOWN_CENTER_Y, TOWN_WIDTH, TOWN_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 import { Player, ClassType, Monster, Item, LogEntry, Rarity, ItemType, Position, ItemOption, Skill } from './types';
 
-// World Config
-const WORLD_WIDTH = 1200;
-const WORLD_HEIGHT = 800;
 const PLAYER_SIZE = 40;
 const MONSTER_SIZE = 40;
 const ITEM_SIZE = 30;
 const SPEED = 5;
 
+// AI Constants
+const AGGRO_RANGE = 220; // Reduced from 300 for smaller activity range
+const LEASH_RANGE = 350; // Reduced from 500 for smaller activity range
+const GRID_SIZE = 400; // Size of a "Zone"
+
 // --- Stat Helper (Level Scaling) ---
 // Returns the value increased by 10% per level
 const getScaledStat = (baseVal: number | undefined, level: number) => {
     if (!baseVal) return 0;
-    // Using ceil to ensure small base stats still get +1 per level visibly
     return Math.ceil(baseVal * (1 + level * 0.1));
 };
 
@@ -81,7 +82,6 @@ const generateLoot = (monsterLevel: number, isElite: boolean, minRarity?: Rarity
   let baseItem: any;
   if (isJewel) {
      const jewels = ITEMS_DB.filter(i => i.type === ItemType.JEWEL);
-     // Randomly pick Bless, Soul or Maya (Chaos)
      baseItem = jewels[Math.floor(Math.random() * jewels.length)];
   } else {
      const gear = ITEMS_DB.filter(i => i.type !== ItemType.JEWEL);
@@ -200,7 +200,7 @@ const calculateStats = (player: Player) => {
 // --- Helper: Map Generation ---
 interface MapDecoration {
   id: string;
-  type: 'tree' | 'stone' | 'river' | 'grass' | 'snow' | 'lava' | 'cloud';
+  type: 'tree' | 'stone' | 'river' | 'grass' | 'snow' | 'lava' | 'cloud' | 'wall' | 'pavement' | 'roof' | 'fountain' | 'sand' | 'crystal';
   x: number;
   y: number;
   w: number;
@@ -210,33 +210,148 @@ interface MapDecoration {
 
 const generateMapDecorations = (mapId: number): MapDecoration[] => {
   const decorations: MapDecoration[] = [];
+  const cx = TOWN_CENTER_X;
+  const cy = TOWN_CENTER_Y;
   
-  // Rivers/Lava
-  for (let i = 0; i < WORLD_WIDTH; i += 20) {
+  // Lorencia Special Layout (Map 0)
+  if (mapId === 0) {
+      const tw = TOWN_WIDTH;
+      const th = TOWN_HEIGHT;
+      const wallThick = 20;
+      const bridgeW = 80;
+      const bridgeH = 80;
+      const gap = 80; // Gap for gates
+
+      // 1. The Moat
+      decorations.push({ id: 'moat-t', type: 'river', x: cx - tw/2 - 60, y: cy - th/2 - 60, w: tw + 120, h: 50 });
+      decorations.push({ id: 'moat-b', type: 'river', x: cx - tw/2 - 60, y: cy + th/2 + 10, w: tw + 120, h: 50 });
+      decorations.push({ id: 'moat-l', type: 'river', x: cx - tw/2 - 60, y: cy - th/2 - 10, w: 50, h: th + 20 });
+      decorations.push({ id: 'moat-r', type: 'river', x: cx + tw/2 + 10, y: cy - th/2 - 10, w: 50, h: th + 20 });
+
+      // 2. Bridges
+      decorations.push({ id: 'bridge-w', type: 'pavement', x: cx - tw/2 - 65, y: cy - bridgeH/2, w: 80, h: bridgeH, style: { zIndex: 1 } });
+      decorations.push({ id: 'bridge-e', type: 'pavement', x: cx + tw/2 - 15, y: cy - bridgeH/2, w: 80, h: bridgeH, style: { zIndex: 1 } });
+      decorations.push({ id: 'bridge-n', type: 'pavement', x: cx - bridgeW/2, y: cy - th/2 - 65, w: bridgeW, h: 80, style: { zIndex: 1 } });
+      decorations.push({ id: 'bridge-s', type: 'pavement', x: cx - bridgeW/2, y: cy + th/2 - 15, w: bridgeW, h: 80, style: { zIndex: 1 } });
+
+      // 3. Floor
+      decorations.push({ id: 'plaza-floor', type: 'pavement', x: cx - tw/2, y: cy - th/2, w: tw, h: th });
+
+      // 4. Walls
+      decorations.push({ id: 'wall-t-l', type: 'wall', x: cx - tw/2, y: cy - th/2, w: tw/2 - gap/2, h: wallThick });
+      decorations.push({ id: 'wall-t-r', type: 'wall', x: cx + gap/2, y: cy - th/2, w: tw/2 - gap/2, h: wallThick });
+      decorations.push({ id: 'wall-b-l', type: 'wall', x: cx - tw/2, y: cy + th/2 - wallThick, w: tw/2 - gap/2, h: wallThick });
+      decorations.push({ id: 'wall-b-r', type: 'wall', x: cx + gap/2, y: cy + th/2 - wallThick, w: tw/2 - gap/2, h: wallThick });
+      decorations.push({ id: 'wall-l-t', type: 'wall', x: cx - tw/2, y: cy - th/2, w: wallThick, h: th/2 - gap/2 });
+      decorations.push({ id: 'wall-l-b', type: 'wall', x: cx - tw/2, y: cy + gap/2, w: wallThick, h: th/2 - gap/2 });
+      decorations.push({ id: 'wall-r-t', type: 'wall', x: cx + tw/2 - wallThick, y: cy - th/2, w: wallThick, h: th/2 - gap/2 });
+      decorations.push({ id: 'wall-r-b', type: 'wall', x: cx + tw/2 - wallThick, y: cy + gap/2, w: wallThick, h: th/2 - gap/2 });
+
+      // 5. Buildings
+      decorations.push({ id: 'building-bar', type: 'roof', x: cx - tw/2 + 30, y: cy - th/2 + 30, w: 120, h: 80 });
+      decorations.push({ id: 'building-bar-sign', type: 'stone', x: cx - tw/2 + 80, y: cy - th/2 + 110, w: 20, h: 20 });
+      decorations.push({ id: 'building-vault', type: 'roof', x: cx + tw/2 - 140, y: cy - th/2 + 30, w: 100, h: 100 });
+      
+      // 6. Fountain
+      decorations.push({ id: 'fountain-base', type: 'stone', x: cx - 30, y: cy - 30, w: 60, h: 60, style: { borderRadius: '50%' } });
+      decorations.push({ id: 'fountain-water', type: 'fountain', x: cx - 20, y: cy - 20, w: 40, h: 40 });
+
+      // 7. Trees (Outside)
+      for (let i=0; i<200; i++) {
+          const tx = Math.random() * WORLD_WIDTH;
+          const ty = Math.random() * WORLD_HEIGHT;
+          if (tx > cx - tw/2 - 150 && tx < cx + tw/2 + 150 && ty > cy - th/2 - 150 && ty < cy + th/2 + 150) continue;
+          decorations.push({ id: `tree-${i}`, type: 'tree', x: tx, y: ty, w: 60, h: 80 });
+      }
+      return decorations;
+  }
+
+  // Noria Special Layout (Map 1)
+  if (mapId === 1) {
+      // Central Crystal & Plaza
+      decorations.push({ id: 'noria-crystal', type: 'crystal', x: cx - 30, y: cy - 30, w: 60, h: 60 });
+      decorations.push({ 
+          id: 'noria-plaza', 
+          type: 'sand', 
+          x: cx - 350, y: cy - 350, w: 700, h: 700, 
+          style: { borderRadius: '50%', zIndex: 0 } 
+      });
+
+      // Radiating Paths (Sand)
+      // 1. East Exit
+      decorations.push({ id: 'path-e', type: 'sand', x: cx + 200, y: cy - 60, w: 1800, h: 120 });
+      // 2. West (curving)
+      decorations.push({ id: 'path-w', type: 'sand', x: cx - 2000, y: cy - 60, w: 1800, h: 120 });
+      // 3. North East (Rotated)
+      decorations.push({ id: 'path-ne', type: 'sand', x: cx, y: cy - 60, w: 1500, h: 120, style: { transform: 'rotate(-45deg)', transformOrigin: '0 50%' } });
+      // 4. South East (Rotated)
+      decorations.push({ id: 'path-se', type: 'sand', x: cx, y: cy - 60, w: 1500, h: 120, style: { transform: 'rotate(45deg)', transformOrigin: '0 50%' } });
+
+      // Dense Forest
+      for (let i=0; i<600; i++) {
+          const tx = Math.random() * WORLD_WIDTH;
+          const ty = Math.random() * WORLD_HEIGHT;
+          
+          // Distance check from center (Safe Zone)
+          const dx = tx - cx;
+          const dy = ty - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          
+          if (dist < 380) continue; // Leave plaza clear
+
+          // Keep paths clear (Rough approximation)
+          if (Math.abs(ty - cy) < 80 && tx > cx) continue; // East
+          if (Math.abs(ty - cy) < 80 && tx < cx) continue; // West
+          
+          // Diagonals (approximate check)
+          const relX = tx - cx;
+          const relY = ty - cy;
+          // NE Band
+          if (relX > 0 && relY < 0 && Math.abs(relX + relY) < 100) continue;
+          // SE Band
+          if (relX > 0 && relY > 0 && Math.abs(relX - relY) < 100) continue;
+
+          decorations.push({ id: `noria-tree-${i}`, type: 'tree', x: tx, y: ty, w: 60, h: 80 });
+      }
+
+      // Some random magical stones
+      for (let i=0; i<50; i++) {
+         const sx = Math.random() * WORLD_WIDTH;
+         const sy = Math.random() * WORLD_HEIGHT;
+         if (Math.sqrt(Math.pow(sx-cx,2) + Math.pow(sy-cy,2)) < 400) continue;
+         decorations.push({ id: `magic-stone-${i}`, type: 'stone', x: sx, y: sy, w: 30, h: 30, style: { filter: 'hue-rotate(90deg)' } });
+      }
+      
+      return decorations;
+  }
+
+  // Other Maps
+  for (let i = 0; i < WORLD_WIDTH; i += 40) {
     if (i > SAFE_ZONE_WIDTH + 100) { 
-        const riverY = 400 + Math.sin(i / 100) * 100;
+        const riverY = (WORLD_HEIGHT / 2) + Math.sin(i / 200) * 300;
         decorations.push({
             id: `fluid-${i}`, 
             type: mapId === 4 ? 'lava' : 'river', 
             x: i, 
             y: riverY, 
-            w: 25, 
-            h: 25
+            w: 50, 
+            h: 50
         });
     }
   }
 
-  const numObjects = 40;
+  const numObjects = 300; // Increased density
   for (let i = 0; i < numObjects; i++) {
     const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
-    if (x < SAFE_ZONE_WIDTH && y < SAFE_ZONE_HEIGHT) continue;
+    // Safe zone check for generic maps
+    if (mapId !== 0 && mapId !== 1 && x < SAFE_ZONE_WIDTH && y < SAFE_ZONE_HEIGHT) continue;
 
     let type: MapDecoration['type'] = 'tree';
-    if (mapId === 2) type = Math.random() > 0.5 ? 'snow' : 'stone'; // Devias
-    else if (mapId === 4) type = 'stone'; // Lost Tower
-    else if (mapId === 5) type = 'cloud'; // Icarus
-    else type = Math.random() > 0.6 ? 'stone' : 'tree'; // General
+    if (mapId === 2) type = Math.random() > 0.5 ? 'snow' : 'stone';
+    else if (mapId === 4) type = 'stone';
+    else if (mapId === 5) type = 'cloud';
+    else type = Math.random() > 0.6 ? 'stone' : 'tree';
 
     decorations.push({
         id: `dec-${i}`,
@@ -249,7 +364,7 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
   }
   
   // Ground details
-  for (let i=0; i < 60; i++) {
+  for (let i=0; i < 400; i++) {
      const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
     decorations.push({
@@ -261,7 +376,6 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
 };
 
 // --- Components ---
-
 const CharacterSelect = ({ onSelect, onLoad }: { onSelect: (c: ClassType, n: string) => void, onLoad: () => void }) => {
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<ClassType>(ClassType.DARK_KNIGHT);
@@ -277,7 +391,7 @@ const CharacterSelect = ({ onSelect, onLoad }: { onSelect: (c: ClassType, n: str
       <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/mu_login/1920/1080')] bg-cover opacity-30"></div>
       <div className="z-10 bg-black/80 p-8 border-2 border-amber-800 rounded-lg shadow-[0_0_50px_rgba(180,83,9,0.3)] max-w-2xl w-full text-center">
         <h1 className="text-5xl font-bold text-amber-500 mb-2 mu-font drop-shadow-lg">MU ONLINE</h1>
-        <h2 className="text-xl text-gray-400 mb-8 tracking-widest">传奇再续</h2>
+        <h2 className="text-xl text-gray-400 mb-8 tracking-widest">传奇再续 - 网页版</h2>
         
         <div className="grid grid-cols-3 gap-4 mb-8">
           {Object.values(ClassType).map((c) => (
@@ -356,17 +470,11 @@ const PlayerAvatar = ({ player, isAttacking }: { player: Player, isAttacking: bo
   );
 };
 
-// --- Tooltip Component ---
 const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, comparisonItem: Item | null, x: number, y: number, location: string }) => {
     const renderStatRow = (label: string, baseVal: number | undefined, level: number, compBaseVal: number | undefined, compLevel: number, colorClass: string = 'text-white') => {
         if (!baseVal) return null;
-        
-        // Current Item Stats
         const currentVal = getScaledStat(baseVal, level);
-        
-        // Comparison Item Stats (if any)
         const compVal = compBaseVal ? getScaledStat(compBaseVal, compLevel) : 0;
-        
         const bonus = currentVal - baseVal;
         const diff = comparisonItem ? currentVal - compVal : 0;
 
@@ -375,7 +483,6 @@ const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, com
                 <div className="flex items-center gap-1">
                     <span className="text-gray-400">{label}:</span>
                     <span className="font-bold">{currentVal}</span>
-                    {/* Show scaling breakdown if item is leveled up */}
                     {level > 0 && bonus > 0 && (
                         <span className="text-[9px] text-gray-500">
                             ({baseVal}<span className="text-green-700">+{bonus}</span>)
@@ -393,14 +500,10 @@ const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, com
 
     const renderCard = (itm: Item, title: string, isComparison: boolean = false) => {
         const compForDiff = isComparison ? null : comparisonItem;
-        
         return (
             <div className="bg-black/95 border-2 border-amber-700 p-2 w-64 shadow-[0_0_15px_rgba(0,0,0,1)] relative z-[100] pointer-events-none rounded">
                 <div className="absolute -top-3 left-2 bg-black px-1 text-[10px] text-gray-500 border border-gray-800">{title}</div>
-                <div className={`font-bold text-sm ${RARITY_COLORS[itm.rarity].split(' ')[0]} border-b border-gray-700 pb-1 mb-1 break-words flex justify-between`}>
-                    <span>{itm.name}</span>
-                    {itm.level > 0 && <span className="text-amber-400">+{itm.level}</span>}
-                </div>
+                <div className={`font-bold text-sm ${RARITY_COLORS[itm.rarity].split(' ')[0]}`}>{itm.name} {itm.level > 0 ? `+${itm.level}` : ''}</div>
                 <div className="text-[10px] text-gray-500 italic mb-2 flex justify-between">
                     <span>{itm.type}</span>
                     <span>{itm.rarity}</span>
@@ -428,17 +531,10 @@ const ItemTooltip = ({ item, comparisonItem, x, y, location }: { item: Item, com
         );
     };
 
-    const getLocationLabel = (loc: string) => {
-        if (loc === 'INVENTORY') return '背包中';
-        if (loc === 'EQUIPPED') return '已装备';
-        if (loc === 'NPC') return '商店';
-        return '详情';
-    };
-
     return (
         <div className="fixed z-[100] pointer-events-none flex gap-2 items-start" style={{ left: Math.min(window.innerWidth - 550, x + 15), top: Math.min(window.innerHeight - 300, y + 15) }}>
             {comparisonItem && renderCard(comparisonItem, "已装备", true)}
-            {renderCard(item, getLocationLabel(location))}
+            {renderCard(item, location === 'INVENTORY' ? '背包中' : location === 'EQUIPPED' ? '已装备' : location === 'NPC' ? '商店' : '详情')}
         </div>
     );
 };
@@ -447,6 +543,7 @@ export default function App() {
   const [gameState, setGameState] = useState<'SELECT' | 'PLAYING'>('SELECT');
   const [player, setPlayer] = useState<Player | null>(null);
   const [monsters, setMonsters] = useState<Monster[]>([]);
+  const [respawnQueue, setRespawnQueue] = useState<Omit<Monster, 'id' | 'respawnTime'> & { respawnTime: number }[]>([]);
   const [groundItems, setGroundItems] = useState<(Item & Position)[]>([]);
   const [activeMap, setActiveMap] = useState(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -458,6 +555,12 @@ export default function App() {
   const [hoveredItem, setHoveredItem] = useState<{item: Item, x: number, y: number, location: string} | null>(null);
   const [isAttacking, setIsAttacking] = useState(false);
   const [mapDecorations, setMapDecorations] = useState<MapDecoration[]>([]);
+  
+  // Camera and Zoom State
+  const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isDraggingMap, setIsDraggingMap] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
 
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -469,6 +572,116 @@ export default function App() {
   useEffect(() => {
     setMapDecorations(generateMapDecorations(activeMap));
   }, [activeMap]);
+
+  // Map Specific Safe Zone Logic
+  const getSafeZoneRect = useCallback((mapId: number) => {
+      if (mapId === 0) {
+          return { x: TOWN_CENTER_X - TOWN_WIDTH/2, y: TOWN_CENTER_Y - TOWN_HEIGHT/2, w: TOWN_WIDTH, h: TOWN_HEIGHT };
+      }
+      return { x: 0, y: 0, w: SAFE_ZONE_WIDTH, h: SAFE_ZONE_HEIGHT };
+  }, []);
+
+  const isSafeZone = useCallback((x: number, y: number, mapId: number) => {
+      // Lorencia (Rectangular)
+      if (mapId === 0) {
+          const rect = { x: TOWN_CENTER_X - TOWN_WIDTH/2, y: TOWN_CENTER_Y - TOWN_HEIGHT/2, w: TOWN_WIDTH, h: TOWN_HEIGHT };
+          return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+      }
+      // Noria (Circular)
+      if (mapId === 1) {
+          const dx = x - TOWN_CENTER_X;
+          const dy = y - TOWN_CENTER_Y;
+          return (dx*dx + dy*dy) < (350 * 350);
+      }
+      // Default (Top Left)
+      const rect = getSafeZoneRect(mapId);
+      return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+  }, [getSafeZoneRect]);
+
+  // Zone-Based Monster Generation
+  const generateFixedMonsters = useCallback((mapId: number) => {
+    const map = MAPS[mapId];
+    // Get potential monsters for this map
+    const validMonsters = MONSTERS_DB.filter(m => m.level >= map.minLvl);
+    if (validMonsters.length === 0) return [];
+
+    const newMonsters: Monster[] = [];
+    const cols = Math.floor(WORLD_WIDTH / GRID_SIZE);
+    const rows = Math.floor(WORLD_HEIGHT / GRID_SIZE);
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const gridX = c * GRID_SIZE;
+            const gridY = r * GRID_SIZE;
+
+            // Skip if grid is substantially inside Safe Zone
+            if (isSafeZone(gridX + GRID_SIZE/2, gridY + GRID_SIZE/2, mapId)) continue;
+
+            // Pick one monster type for this zone
+            const template = validMonsters[Math.floor(Math.random() * validMonsters.length)];
+            
+            // Spawn 0-2 monsters per grid (approx 80-150 per map)
+            // 20% chance for 0, 40% for 1, 40% for 2
+            const rand = Math.random();
+            const count = rand < 0.2 ? 0 : (rand < 0.6 ? 1 : 2);
+            
+            for (let i = 0; i < count; i++) {
+                const isBoss = Math.random() < 0.005; // Rare per grid
+                const isElite = !isBoss && Math.random() < 0.08;
+
+                const scaleFactor = 1 + (map.minLvl * 0.02);
+                const baseHp = template.maxHp * scaleFactor;
+                const baseMin = template.minDmg * scaleFactor;
+                const baseMax = template.maxDmg * scaleFactor;
+                const baseExp = template.exp * scaleFactor;
+     
+                const hp = isBoss ? baseHp * 8 : isElite ? baseHp * 2 : baseHp;
+                const minDmg = isBoss ? baseMin * 2 : isElite ? baseMin * 1.5 : baseMin;
+                const maxDmg = isBoss ? baseMax * 2 : isElite ? baseMax * 1.5 : baseMax;
+                const exp = isBoss ? baseExp * 15 : isElite ? baseExp * 3 : baseExp;
+                
+                const sizeScale = isBoss ? 2.5 : isElite ? 1.5 : 1;
+
+                // Random pos within grid
+                const spawnX = gridX + Math.random() * (GRID_SIZE - 40);
+                const spawnY = gridY + Math.random() * (GRID_SIZE - 40);
+
+                // Ensure monster doesn't spawn in safe zone
+                if (isSafeZone(spawnX, spawnY, mapId)) continue;
+
+                newMonsters.push({
+                    ...template,
+                    id: Math.random().toString(),
+                    name: isBoss ? `世界BOSS ${template.name}` : isElite ? `精英 ${template.name}` : template.name,
+                    hp: Math.floor(hp),
+                    maxHp: Math.floor(hp),
+                    minDmg: Math.floor(minDmg),
+                    maxDmg: Math.floor(maxDmg),
+                    exp: Math.floor(exp),
+                    isElite: isElite,
+                    isBoss: isBoss,
+                    x: spawnX,
+                    y: spawnY,
+                    width: MONSTER_SIZE * sizeScale,
+                    height: MONSTER_SIZE * sizeScale,
+                    lastAttack: 0,
+                    originX: spawnX,
+                    originY: spawnY
+                });
+            }
+        }
+    }
+    return newMonsters;
+  }, [isSafeZone]);
+
+  // Generate monsters when map changes
+  useEffect(() => {
+      if (gameState === 'PLAYING') {
+          const initialMobs = generateFixedMonsters(activeMap);
+          setMonsters(initialMobs);
+          setRespawnQueue([]); // Clear old respawns
+      }
+  }, [activeMap, gameState, generateFixedMonsters]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -496,6 +709,31 @@ export default function App() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  // Map Dragging Handlers
+  const handleMapMouseDown = (e: React.MouseEvent) => {
+    setIsDraggingMap(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMapMouseMove = (e: React.MouseEvent) => {
+    if (isDraggingMap) {
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setCameraOffset(prev => ({ x: prev.x - dx, y: prev.y - dy }));
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+    }
+  };
+
+  const handleMapMouseUp = () => {
+    setIsDraggingMap(false);
+  };
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    const delta = -e.deltaY * 0.001;
+    setZoom(z => Math.min(2.0, Math.max(0.5, z + delta)));
+  }, []);
 
   const addLog = (message: string, type: LogEntry['type'] = 'info') => {
     setLogs(prev => [...prev.slice(-19), { id: Math.random().toString(), message, type }]);
@@ -535,6 +773,9 @@ export default function App() {
 
   const initializePlayer = (cls: ClassType, name: string) => {
     const base = INITIAL_STATS[cls];
+    const startX = activeMap === 0 ? TOWN_CENTER_X : SAFE_ZONE_WIDTH / 2;
+    const startY = activeMap === 0 ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT / 2;
+    
     const newPlayer: Player = {
       id: 'player-1',
       name,
@@ -551,21 +792,22 @@ export default function App() {
       maxMana: base.mana,
       inventory: [],
       equipment: { weapon: null, helmet: null, armor: null, pants: null, boots: null, gloves: null, necklace: null, ring: null, wings: null },
-      x: SAFE_ZONE_WIDTH / 2,
-      y: SAFE_ZONE_HEIGHT / 2,
+      x: startX,
+      y: startY,
       width: PLAYER_SIZE,
       height: PLAYER_SIZE
     };
     setPlayer(newPlayer);
     setGameState('PLAYING');
-    setMonsters([]);
+    setMonsters([]); // Cleared initially, useEffect triggers generation
     setGroundItems([]);
+    setCameraOffset({ x: 0, y: 0 });
     addLog(`欢迎来到奇迹MU, ${name}!`, 'info');
   };
 
   const tryAutoPickup = useCallback(() => {
     if (!player) return;
-    const pickupRange = 300; // Significantly increased pickup range
+    const pickupRange = 300;
     const itemsToPickup = groundItems.filter(item => {
       const dx = item.x - player.x;
       const dy = item.y - player.y;
@@ -589,88 +831,76 @@ export default function App() {
     }
   }, [player, groundItems]);
 
+  // Game Loop: Movement, AI, Respawn
   useEffect(() => {
     if (gameState !== 'PLAYING' || !player) return;
     const loop = setInterval(() => {
       setPlayer(prevPlayer => {
         if (!prevPlayer) return null;
         let { x, y } = prevPlayer;
-        if (keysPressed.has('ArrowUp')) y = Math.max(0, y - SPEED);
-        if (keysPressed.has('ArrowDown')) y = Math.min(WORLD_HEIGHT - PLAYER_SIZE, y + SPEED);
-        if (keysPressed.has('ArrowLeft')) x = Math.max(0, x - SPEED);
-        if (keysPressed.has('ArrowRight')) x = Math.min(WORLD_WIDTH - PLAYER_SIZE, x + SPEED);
-        return { ...prevPlayer, x, y };
+        let nextX = x;
+        let nextY = y;
+
+        if (keysPressed.has('ArrowUp')) nextY = Math.max(0, y - SPEED);
+        if (keysPressed.has('ArrowDown')) nextY = Math.min(WORLD_HEIGHT - PLAYER_SIZE, y + SPEED);
+        if (keysPressed.has('ArrowLeft')) nextX = Math.max(0, x - SPEED);
+        if (keysPressed.has('ArrowRight')) nextX = Math.min(WORLD_WIDTH - PLAYER_SIZE, x + SPEED);
+        
+        return { ...prevPlayer, x: nextX, y: nextY };
       });
 
       if (keysPressed.has(' ')) tryAutoPickup();
 
-      const isSafeZone = (x: number, y: number) => x < SAFE_ZONE_WIDTH && y < SAFE_ZONE_HEIGHT;
+      const playerInSafe = player ? isSafeZone(player.x, player.y, activeMap) : false;
+      const now = Date.now();
 
+      // --- Handle Monster AI ---
       setMonsters(prevMonsters => {
-        if (prevMonsters.length < 5 + (activeMap * 2)) {
-           const map = MAPS[activeMap];
-           const validMonsters = MONSTERS_DB.filter(m => m.level >= map.minLvl);
-           const template = validMonsters.length > 0 ? validMonsters[Math.floor(Math.random() * validMonsters.length)] : MONSTERS_DB[0];
-           
-           const isBoss = Math.random() < 0.01;
-           const isElite = !isBoss && Math.random() < 0.1;
-           
-           const scaleFactor = 1 + (player.level * 0.05);
-
-           const baseHp = template.maxHp * scaleFactor;
-           const baseMin = template.minDmg * scaleFactor;
-           const baseMax = template.maxDmg * scaleFactor;
-           const baseExp = template.exp * scaleFactor;
-
-           const hp = isBoss ? baseHp * 8 : isElite ? baseHp * 2 : baseHp;
-           const minDmg = isBoss ? baseMin * 2 : isElite ? baseMin * 1.5 : baseMin;
-           const maxDmg = isBoss ? baseMax * 2 : isElite ? baseMax * 1.5 : baseMax;
-           const exp = isBoss ? baseExp * 15 : isElite ? baseExp * 3 : baseExp;
-           
-           const sizeScale = isBoss ? 2.5 : isElite ? 1.5 : 1;
-
-           let spawnX = Math.random() * (WORLD_WIDTH - 50);
-           let spawnY = Math.random() * (WORLD_HEIGHT - 50);
-           if (isSafeZone(spawnX, spawnY)) {
-             spawnX = SAFE_ZONE_WIDTH + 50 + Math.random() * 200;
-             spawnY = SAFE_ZONE_HEIGHT + 50 + Math.random() * 200;
-           }
-           return [...prevMonsters, {
-             ...template,
-             id: Math.random().toString(),
-             name: isBoss ? `世界BOSS ${template.name}` : isElite ? `精英 ${template.name}` : template.name,
-             hp: Math.floor(hp),
-             maxHp: Math.floor(hp),
-             minDmg: Math.floor(minDmg),
-             maxDmg: Math.floor(maxDmg),
-             exp: Math.floor(exp),
-             isElite: isElite,
-             isBoss: isBoss,
-             x: spawnX,
-             y: spawnY,
-             width: MONSTER_SIZE * sizeScale,
-             height: MONSTER_SIZE * sizeScale,
-             lastAttack: 0
-           }];
-        }
-        
         return prevMonsters.map(m => {
            if (!player) return m;
-           const dx = player.x - m.x;
-           const dy = player.y - m.y;
-           const dist = Math.sqrt(dx*dx + dy*dy);
+           
+           const distToPlayer = Math.sqrt(Math.pow(player.x - m.x, 2) + Math.pow(player.y - m.y, 2));
+           const distToOrigin = Math.sqrt(Math.pow(m.originX - m.x, 2) + Math.pow(m.originY - m.y, 2));
+           
            let newX = m.x;
            let newY = m.y;
-           const playerInSafe = isSafeZone(player.x, player.y);
-
-           if (dist > 40 && !playerInSafe) {
-             const speed = m.isBoss ? 1.5 : m.isElite ? 2.5 : 2;
-             newX += (dx / dist) * speed; 
-             newY += (dy / dist) * speed;
+           
+           // State 1: Aggro (Chase Player)
+           // Condition: Player nearby AND not Leashed AND Player not in safe zone
+           if (distToPlayer < AGGRO_RANGE && distToOrigin < LEASH_RANGE && !playerInSafe) {
+               const speed = m.isBoss ? 1.5 : m.isElite ? 2.5 : 2;
+               const dx = player.x - m.x;
+               const dy = player.y - m.y;
+               // Normalize vector
+               const vx = (dx / distToPlayer) * speed;
+               const vy = (dy / distToPlayer) * speed;
+               
+               const nextX = m.x + vx;
+               const nextY = m.y + vy;
+               
+               // Check collision with safe zone
+               if (!isSafeZone(nextX, nextY, activeMap)) {
+                   newX = nextX;
+                   newY = nextY;
+               }
+           } 
+           // State 2: Return to Origin (Leashed or Player ran away)
+           else if (distToOrigin > 10) {
+               // Return slowly
+               const returnSpeed = 2;
+               const dx = m.originX - m.x;
+               const dy = m.originY - m.y;
+               const dist = Math.sqrt(dx*dx + dy*dy);
+               newX = m.x + (dx / dist) * returnSpeed;
+               newY = m.y + (dy / dist) * returnSpeed;
+           }
+           // State 3: Idle (At origin) - No movement or slight wobble
+           else {
+               // Optional: add tiny wobble here if desired, but "don't move" was requested
            }
 
-           const now = Date.now();
-           if (dist < (50 * (m.isBoss ? 1.5 : 1)) && now - m.lastAttack > 2000 && !playerInSafe) {
+           // Attack Logic
+           if (distToPlayer < (50 * (m.isBoss ? 1.5 : 1)) && now - m.lastAttack > 2000 && !playerInSafe) {
              setPlayer(p => {
                 if (!p) return null;
                 const stats = calculateStats(p);
@@ -683,7 +913,9 @@ export default function App() {
                 
                 if (p.hp - dmg <= 0) {
                   addLog("你死亡了! 重生中...", "error");
-                  return { ...p, hp: p.maxHp, x: SAFE_ZONE_WIDTH/2, y: SAFE_ZONE_HEIGHT/2 };
+                  const respawnX = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_X : SAFE_ZONE_WIDTH/2;
+                  const respawnY = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT/2;
+                  return { ...p, hp: p.maxHp, x: respawnX, y: respawnY };
                 }
                 return { ...p, hp: p.hp - dmg };
              });
@@ -693,8 +925,30 @@ export default function App() {
         });
       });
 
+      // --- Handle Respawn Queue ---
+      setRespawnQueue(prevQ => {
+          const readyToSpawn = prevQ.filter(task => task.respawnTime <= now);
+          const pending = prevQ.filter(task => task.respawnTime > now);
+
+          if (readyToSpawn.length > 0) {
+              const spawnedMobs: Monster[] = readyToSpawn.map(task => ({
+                  ...task,
+                  id: Math.random().toString(),
+                  hp: task.maxHp, // Full HP on respawn
+                  x: task.originX, // Reset to origin
+                  y: task.originY,
+                  lastAttack: 0,
+                  // No respawnTime on live monster
+              }));
+              
+              setMonsters(prev => [...prev, ...spawnedMobs]);
+              // Optional: addLog(`Map Entity Respawned (${spawnedMobs.length})`, 'info');
+          }
+          return pending;
+      });
+
       if (keysPressed.has('1') || keysPressed.has('2') || keysPressed.has('3')) {
-        if (!isSafeZone(player.x, player.y)) {
+        if (!playerInSafe) {
             const skillIdx = keysPressed.has('1') ? 0 : keysPressed.has('2') ? 1 : 2;
             const skills = SKILLS[player.class];
             if (skills[skillIdx]) useSkill(skills[skillIdx]);
@@ -703,7 +957,7 @@ export default function App() {
       setFloatingTexts(prev => prev.filter(ft => Date.now() - ft.id < 1000));
     }, 30);
     return () => clearInterval(loop);
-  }, [gameState, keysPressed, activeMap, tryAutoPickup, player]); 
+  }, [gameState, keysPressed, activeMap, tryAutoPickup, player, isSafeZone]); 
 
   useEffect(() => {
     if (!player) return;
@@ -713,7 +967,6 @@ export default function App() {
           const stats = calculateStats(p);
           const hpRegenAmount = 1 + Math.floor(stats.hpRegen);
           const manaRegenAmount = 1 + Math.floor(stats.manaRegen);
-          
           return { 
               ...p, 
               hp: Math.min(p.maxHp, p.hp + hpRegenAmount), 
@@ -773,7 +1026,7 @@ export default function App() {
 
          if (m.hp - totalDmg <= 0) {
            handleMonsterKill(m, stats);
-           return null;
+           return null; // Remove from active list, handled in handleMonsterKill
          }
          return { ...m, hp: m.hp - totalDmg };
        }
@@ -832,14 +1085,15 @@ export default function App() {
     itemsToDrop.forEach(drop => {
         const offX = (Math.random() - 0.5) * 50;
         const offY = (Math.random() - 0.5) * 50;
-        
         setGroundItems(prev => [...prev, { ...drop, x: m.x + offX, y: m.y + offY }]);
         addLog(`掉落: ${drop.name}`, 'loot');
-        
-        if (drop.type === ItemType.JEWEL || drop.rarity === Rarity.GOLD) {
-            playDropSound();
-        }
+        if (drop.type === ItemType.JEWEL || drop.rarity === Rarity.GOLD) playDropSound();
     });
+
+    // Queue Respawn
+    const respawnDelay = 3000 + Math.random() * 7000; // 3 to 10 seconds
+    const { id, ...monsterData } = m;
+    setRespawnQueue(prev => [...prev, { ...monsterData, respawnTime: Date.now() + respawnDelay }]);
   };
 
   const pickUpItem = (item: Item & Position) => {
@@ -914,14 +1168,14 @@ export default function App() {
   if (!player) return null;
   const currentMap = MAPS[activeMap];
 
-  // Map Background Logic
   let mapClass = '';
-  if (activeMap === 1) mapClass = 'bg-grass-pattern';
+  if (activeMap === 0) mapClass = 'bg-grass-pattern'; 
+  else if (activeMap === 1) mapClass = 'bg-grass-pattern';
   else if (activeMap === 2) mapClass = 'bg-snow-pattern';
   else if (activeMap === 3) mapClass = 'bg-stone-pattern';
   else if (activeMap === 4) mapClass = 'bg-lava-pattern';
   else if (activeMap === 5) mapClass = 'bg-sky-pattern';
-  else mapClass = 'bg-[#0c0a09]'; // Default Lorencia/Dark
+  else mapClass = 'bg-[#0c0a09]';
 
   const getComparisonItem = (hoverItem: Item): Item | null => {
       if (!hoverItem) return null;
@@ -939,68 +1193,141 @@ export default function App() {
           default: return null;
       }
   };
+  
+  const viewX = (window.innerWidth / 2) - cameraOffset.x - (player.x * zoom);
+  const viewY = (window.innerHeight / 2) - cameraOffset.y - (player.y * zoom);
+  
+  // Only render visible entities (Optimization)
+  const visibleMonsters = monsters.filter(m => {
+      const screenX = viewX + m.x * zoom;
+      const screenY = viewY + m.y * zoom;
+      return screenX > -100 && screenX < window.innerWidth + 100 && screenY > -100 && screenY < window.innerHeight + 100;
+  });
+
+  const visibleGroundItems = groundItems.filter(i => {
+      const screenX = viewX + i.x * zoom;
+      const screenY = viewY + i.y * zoom;
+      return screenX > -100 && screenX < window.innerWidth + 100 && screenY > -100 && screenY < window.innerHeight + 100;
+  });
 
   return (
     <div className="h-screen w-full bg-black text-gray-200 overflow-hidden flex flex-col">
       
-      <div className="h-12 bg-[#111] flex items-center justify-between px-4 border-b border-[#333] z-20">
+      <div className="h-12 bg-[#111] flex items-center justify-between px-4 border-b border-[#333] z-20 relative">
          <div className="flex gap-4 items-center">
             <span className="text-amber-500 font-bold mu-font">{currentMap.name}</span>
             <span className="text-xs text-gray-500">坐标: {Math.floor(player.x)}, {Math.floor(player.y)}</span>
-            <span className="text-xs text-gray-500">方向键移动 | 1,2,3 攻击 | 空格 拾取</span>
+            <span className="text-xs text-gray-500 hidden md:inline">方向键移动 | 鼠标拖拽平移 | 滚轮缩放 | 1,2,3 攻击 | 空格 拾取</span>
+            <span className="text-xs text-blue-400 font-bold">缩放: {(zoom * 100).toFixed(0)}%</span>
+            <span className="text-xs text-red-900">Mobs: {monsters.length}</span>
          </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden bg-black cursor-crosshair select-none">
-         <div className={`absolute inset-0 ${mapClass}`} />
-         <div className="map-vignette" />
-         
-         {/* Added Fog/Noise overlay for beautification */}
+      {/* Main Game Viewport */}
+      <div 
+        className="flex-1 relative overflow-hidden bg-black cursor-crosshair select-none"
+        onMouseDown={handleMapMouseDown}
+        onMouseMove={handleMapMouseMove}
+        onMouseUp={handleMapMouseUp}
+        onMouseLeave={handleMapMouseUp}
+        onWheel={handleWheel}
+      >
+         {/* Static Overlay Effects */}
+         <div className="map-vignette z-10" />
          <div className="absolute inset-0 opacity-10 pointer-events-none z-[1] mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
 
-         {mapDecorations.map(dec => {
-             if (dec.type === 'river') return <div key={dec.id} className="absolute water-pattern rounded-full opacity-60 blur-sm" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }} />
-             if (dec.type === 'lava') return <div key={dec.id} className="absolute bg-red-600 rounded-full opacity-60 blur-md animate-pulse" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '0 0 20px red' }} />
-             if (dec.type === 'tree') return <div key={dec.id} className="absolute flex flex-col items-center justify-end z-[2]" style={{ left: dec.x, top: dec.y }}><div className="w-12 h-24 bg-green-900 rounded-t-full opacity-80 border-b-4 border-black shadow-2xl"></div><div className="w-4 h-4 bg-amber-900"></div></div>
-             if (dec.type === 'stone') return <div key={dec.id} className="absolute bg-gray-700 rounded-lg border-2 border-gray-500 z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '2px 2px 5px black' }}></div>
-             if (dec.type === 'snow') return <div key={dec.id} className="absolute bg-slate-200 rounded-full blur-[1px] z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, opacity: 0.8 }}></div>
-             if (dec.type === 'cloud') return <div key={dec.id} className="absolute bg-white rounded-full blur-xl opacity-20 z-[5]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
-             if (dec.type === 'grass') return <div key={dec.id} className={`absolute text-xs opacity-50 z-[1] ${activeMap === 1 ? 'text-green-600' : activeMap === 2 ? 'text-white' : 'text-gray-600'}`} style={{ left: dec.x, top: dec.y }}>{activeMap === 2 ? '❄️' : '🌱'}</div>
-             return null;
-         })}
+         {/* Transformed World Container */}
+         <div 
+            className="absolute top-0 left-0"
+            style={{ 
+                width: WORLD_WIDTH, 
+                height: WORLD_HEIGHT,
+                transform: `translate(${viewX}px, ${viewY}px) scale(${zoom})`,
+                transformOrigin: '0 0',
+                willChange: 'transform'
+            }}
+         >
+             <div className={`absolute inset-0 ${mapClass}`} />
+             
+             {mapDecorations.map(dec => {
+                 // Viewport culling for decorations could be added here for extra performance
+                 if (dec.type === 'pavement') return <div key={dec.id} className="absolute bg-pavement border-2 border-gray-700 z-[1] shadow-inner" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, ...dec.style }}></div>
+                 if (dec.type === 'wall') return <div key={dec.id} className="absolute bg-wall border border-black z-[2] shadow-xl" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
+                 if (dec.type === 'roof') return <div key={dec.id} className="absolute bg-roof border-4 border-gray-800 z-[3] shadow-2xl flex items-center justify-center" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}><div className="w-[90%] h-[90%] border border-gray-600/30"></div></div>
+                 if (dec.type === 'fountain') return <div key={dec.id} className="absolute fountain-water rounded-full blur-sm z-[2] border-4 border-white/20" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
+                 
+                 if (dec.type === 'sand') return <div key={dec.id} className="absolute bg-sand-pattern opacity-80 z-[0]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, ...dec.style }}></div>
+                 if (dec.type === 'crystal') return <div key={dec.id} className="absolute crystal-glow z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
 
-         <div className="absolute top-0 left-0 safe-zone-dome flex items-center justify-center z-0" style={{ width: SAFE_ZONE_WIDTH, height: SAFE_ZONE_HEIGHT }}>
-            <div className="text-blue-400/20 font-bold text-4xl -rotate-45 select-none border-4 border-blue-500/20 p-4 rounded-xl">安全区</div>
-         </div>
-
-         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
-            {groundItems.map(item => (
-              <div key={item.id} className="absolute flex flex-col items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform z-[3]" style={{ left: item.x, top: item.y, width: ITEM_SIZE, height: ITEM_SIZE }} onClick={() => pickUpItem(item)} onMouseEnter={(e) => setHoveredItem({ item, x: e.clientX, y: e.clientY, location: 'GROUND' })} onMouseLeave={() => setHoveredItem(null)}>
-                {item.rarity === Rarity.GOLD && <div className="light-pillar"></div>}
-                <span className={`text-xl animate-bounce ${item.rarity === Rarity.GOLD ? 'drop-shadow-[0_0_5px_rgba(255,215,0,0.8)]' : ''}`}>{item.icon}</span>
-                <span className={`text-[9px] font-bold px-1 bg-black/50 rounded whitespace-nowrap ${RARITY_COLORS[item.rarity].split(' ')[0]}`}>{item.name}</span>
-              </div>
-            ))}
-            {monsters.map(m => (
-              <div key={m.id} className="absolute flex flex-col items-center transition-all duration-100 z-[4]" style={{ left: m.x, top: m.y, width: m.width, height: m.height }}>
-                 {/* Improved Health Bar: Bigger, on top, clear text */}
-                 <div className="absolute -top-4 w-[120%] left-[-10%] h-3 bg-black border border-gray-500 rounded overflow-hidden shadow-sm">
-                    <div className="h-full bg-gradient-to-r from-red-600 to-red-800 transition-all duration-200" style={{ width: `${(m.hp/m.maxHp)*100}%` }}></div>
-                    <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] leading-none">
-                        {m.hp}/{m.maxHp}
-                    </span>
+                 if (dec.type === 'river') return <div key={dec.id} className="absolute water-pattern opacity-60 blur-sm z-0" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, borderRadius: activeMap === 0 ? '5px' : '50%' }} />
+                 if (dec.type === 'lava') return <div key={dec.id} className="absolute bg-red-600 rounded-full opacity-60 blur-md animate-pulse" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '0 0 20px red' }} />
+                 if (dec.type === 'tree') return <div key={dec.id} className="absolute flex flex-col items-center justify-end z-[2]" style={{ left: dec.x, top: dec.y }}><div className="w-12 h-24 bg-green-900 rounded-t-full opacity-80 border-b-4 border-black shadow-2xl"></div><div className="w-4 h-4 bg-amber-900"></div></div>
+                 if (dec.type === 'stone') return <div key={dec.id} className="absolute bg-gray-700 rounded-lg border-2 border-gray-500 z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, boxShadow: '2px 2px 5px black', ...dec.style }}></div>
+                 if (dec.type === 'snow') return <div key={dec.id} className="absolute bg-slate-200 rounded-full blur-[1px] z-[2]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, opacity: 0.8 }}></div>
+                 if (dec.type === 'cloud') return <div key={dec.id} className="absolute bg-white rounded-full blur-xl opacity-20 z-[5]" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
+                 if (dec.type === 'grass') return <div key={dec.id} className={`absolute text-xs opacity-50 z-[1] ${activeMap === 1 ? 'text-green-600' : activeMap === 2 ? 'text-white' : 'text-gray-600'}`} style={{ left: dec.x, top: dec.y }}>{activeMap === 2 ? '❄️' : '🌱'}</div>
+                 return null;
+             })}
+             
+             {/* Safe Zone Indicator for Maps 0, 1 or standard safe zone */}
+             {(activeMap !== 0 && activeMap !== 1) ? (
+                <div className="absolute top-0 left-0 safe-zone-dome flex items-center justify-center z-0" style={{ width: SAFE_ZONE_WIDTH, height: SAFE_ZONE_HEIGHT }}>
+                    <div className="text-blue-400/20 font-bold text-4xl -rotate-45 select-none border-4 border-blue-500/20 p-4 rounded-xl">安全区</div>
+                </div>
+             ) : (
+                 <div className="absolute safe-zone-dome flex items-center justify-center z-0" 
+                      style={ activeMap === 0 ? 
+                        { left: TOWN_CENTER_X - TOWN_WIDTH/2, top: TOWN_CENTER_Y - TOWN_HEIGHT/2, width: TOWN_WIDTH, height: TOWN_HEIGHT } :
+                        { left: TOWN_CENTER_X - 350, top: TOWN_CENTER_Y - 350, width: 700, height: 700, borderRadius: '50%' }
+                      }
+                 >
+                    {/* Safe zone visual only */}
                  </div>
-                 <div className={`text-3xl ${m.isBoss ? 'scale-150 filter drop-shadow-[0_0_15px_rgba(255,0,0,1)]' : m.isElite ? 'scale-125 filter drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]' : ''}`}>{m.image}</div>
-                 <span className={`text-[10px] font-bold whitespace-nowrap drop-shadow-md ${m.isBoss ? 'text-red-500 text-lg mt-1' : m.isElite ? 'text-yellow-400' : 'text-gray-300'}`}>{m.name}</span>
-              </div>
-            ))}
-            <div className="absolute transition-all duration-75 z-20" style={{ left: player.x, top: player.y, width: player.width, height: player.height }}>
-               <span className="absolute top-[-30px] w-full text-center text-xs text-emerald-400 font-bold whitespace-nowrap z-50 drop-shadow-md bg-black/30 px-2 rounded">{player.name}</span>
-               <PlayerAvatar player={player} isAttacking={isAttacking} />
-            </div>
-            {floatingTexts.map(ft => (
-              <div key={ft.id} className={`absolute damage-text ${ft.color} z-[100]`} style={{ left: ft.x, top: ft.y }}>{ft.text}</div>
-            ))}
+             )}
+
+             {activeMap === 0 && (
+                 <div className="absolute text-center z-[1] pointer-events-none" style={{ left: TOWN_CENTER_X - 50, top: TOWN_CENTER_Y + 120 }}>
+                      <div className="text-gray-500/30 font-bold text-2xl select-none">勇者大陆</div>
+                 </div>
+             )}
+
+             {activeMap === 1 && (
+                 <div className="absolute text-center z-[1] pointer-events-none" style={{ left: TOWN_CENTER_X - 40, top: TOWN_CENTER_Y + 50 }}>
+                      <div className="text-green-300/40 font-bold text-2xl select-none mu-font">仙踪林</div>
+                 </div>
+             )}
+
+             {/* Entities Layer */}
+             <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
+                {visibleGroundItems.map(item => (
+                  <div key={item.id} className="absolute flex flex-col items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform z-[3]" style={{ left: item.x, top: item.y, width: ITEM_SIZE, height: ITEM_SIZE }} onClick={(e) => { e.stopPropagation(); pickUpItem(item); }} onMouseEnter={(e) => setHoveredItem({ item, x: e.clientX, y: e.clientY, location: 'GROUND' })} onMouseLeave={() => setHoveredItem(null)}>
+                    {item.rarity === Rarity.GOLD && <div className="light-pillar"></div>}
+                    <span className={`text-xl animate-bounce ${item.rarity === Rarity.GOLD ? 'drop-shadow-[0_0_5px_rgba(255,215,0,0.8)]' : ''}`}>{item.icon}</span>
+                    <span className={`text-[9px] font-bold px-1 bg-black/50 rounded whitespace-nowrap ${RARITY_COLORS[item.rarity].split(' ')[0]}`}>{item.name}</span>
+                  </div>
+                ))}
+                
+                {visibleMonsters.map(m => (
+                  <div key={m.id} className="absolute flex flex-col items-center transition-all duration-100 z-[4]" style={{ left: m.x, top: m.y, width: m.width, height: m.height }}>
+                     <div className="absolute -top-4 w-[120%] left-[-10%] h-3 bg-black border border-gray-500 rounded overflow-hidden shadow-sm">
+                        <div className="h-full bg-gradient-to-r from-red-600 to-red-800 transition-all duration-200" style={{ width: `${(m.hp/m.maxHp)*100}%` }}></div>
+                        <span className="absolute inset-0 flex items-center justify-center text-[8px] text-white font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] leading-none">
+                            {m.hp}/{m.maxHp}
+                        </span>
+                     </div>
+                     <div className={`text-3xl ${m.isBoss ? 'scale-150 filter drop-shadow-[0_0_15px_rgba(255,0,0,1)]' : m.isElite ? 'scale-125 filter drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]' : ''}`}>{m.image}</div>
+                     <span className={`text-[10px] font-bold whitespace-nowrap drop-shadow-md ${m.isBoss ? 'text-red-500 text-lg mt-1' : m.isElite ? 'text-yellow-400' : 'text-gray-300'}`}>{m.name}</span>
+                  </div>
+                ))}
+
+                <div className="absolute transition-all duration-75 z-20" style={{ left: player.x, top: player.y, width: player.width, height: player.height }}>
+                   <span className="absolute top-[-30px] w-full text-center text-xs text-emerald-400 font-bold whitespace-nowrap z-50 drop-shadow-md bg-black/30 px-2 rounded">{player.name}</span>
+                   <PlayerAvatar player={player} isAttacking={isAttacking} />
+                </div>
+                {floatingTexts.map(ft => (
+                  <div key={ft.id} className={`absolute damage-text ${ft.color} z-[100]`} style={{ left: ft.x, top: ft.y }}>{ft.text}</div>
+                ))}
+             </div>
          </div>
       </div>
       
@@ -1121,7 +1448,18 @@ export default function App() {
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center" onClick={() => setOpenMenu(null)}>
            <div className="grid grid-cols-2 gap-4 p-4">
               {MAPS.map((m, i) => (
-                <button key={m.name} onClick={(e) => { e.stopPropagation(); setActiveMap(i); setOpenMenu(null); }} className={`p-6 border-2 rounded ${activeMap === i ? 'border-amber-500 text-amber-500' : 'border-gray-600 text-gray-400'}`}>{m.name} (Lv {m.minLvl})</button>
+                <button key={m.name} onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setActiveMap(i); 
+                  setOpenMenu(null);
+                  
+                  // Teleport to Map Center/Safe Zone
+                  const newX = (i === 0 || i === 1) ? TOWN_CENTER_X : SAFE_ZONE_WIDTH / 2;
+                  const newY = (i === 0 || i === 1) ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT / 2;
+                  setPlayer(prev => prev ? ({ ...prev, x: newX, y: newY }) : null);
+                  setCameraOffset({ x: 0, y: 0 });
+
+                }} className={`p-6 border-2 rounded ${activeMap === i ? 'border-amber-500 text-amber-500' : 'border-gray-600 text-gray-400'}`}>{m.name} (Lv {m.minLvl})</button>
               ))}
            </div>
         </div>
