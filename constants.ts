@@ -1,3 +1,4 @@
+
 import { ClassType, Monster, Item, ItemType, Rarity, Skill } from './types';
 
 export const SAFE_ZONE_WIDTH = 300;
@@ -69,13 +70,25 @@ export const MAX_INVENTORY_PAGES = 3;
 export const MAX_INVENTORY_SIZE = INVENTORY_PAGE_SIZE * MAX_INVENTORY_PAGES;
 
 export const MONSTERS_DB: Omit<Monster, 'id' | 'hp' | 'x' | 'y' | 'width' | 'height' | 'lastAttack' | 'isElite' | 'originX' | 'originY'>[] = [
+  // Low Level (Lorencia/Noria)
   { name: '蜘蛛', level: 1, maxHp: 30, minDmg: 1, maxDmg: 3, exp: 15, image: '🕷️' },
   { name: '猎犬怪', level: 5, maxHp: 80, minDmg: 5, maxDmg: 10, exp: 35, image: '🐕' },
   { name: '蛮牛怪', level: 10, maxHp: 160, minDmg: 12, maxDmg: 20, exp: 80, image: '🐂' },
   { name: '骷髅兵', level: 15, maxHp: 250, minDmg: 20, maxDmg: 35, exp: 150, image: '💀' },
+  
+  // Devias (Ice Wind Valley)
+  { name: '雪虫', level: 20, maxHp: 400, minDmg: 30, maxDmg: 45, exp: 250, image: '🐛' },
+  { name: '寒冰魔', level: 24, maxHp: 600, minDmg: 45, maxDmg: 60, exp: 400, image: '🧊' },
+  { name: '蓝魔怪', level: 28, maxHp: 700, minDmg: 55, maxDmg: 70, exp: 500, image: '👹' },
+  { name: '暗杀者', level: 32, maxHp: 850, minDmg: 65, maxDmg: 85, exp: 650, image: '🥷' },
+  { name: '雪人', level: 38, maxHp: 1200, minDmg: 80, maxDmg: 100, exp: 900, image: '🦍' },
+  { name: '雪人王', level: 45, maxHp: 2500, minDmg: 120, maxDmg: 150, exp: 1500, image: '🦍' }, // Elite visually handled
+  { name: '冰后', level: 55, maxHp: 8000, minDmg: 180, maxDmg: 250, exp: 4000, image: '👸' }, // Boss
+
+  // High Level
   { name: '巨人', level: 25, maxHp: 800, minDmg: 50, maxDmg: 70, exp: 450, image: '👹' },
   { name: '死神戈登', level: 40, maxHp: 2000, minDmg: 80, maxDmg: 120, exp: 1000, image: '👿' },
-  { name: '黄金火龙王', level: 60, maxHp: 8000, minDmg: 150, maxDmg: 300, exp: 3000, image: '🐲' },
+  { name: '黄金火龙王', level: 60, maxHp: 15000, minDmg: 250, maxDmg: 400, exp: 10000, image: '🐲' },
 ];
 
 export const ITEMS_DB: Omit<Item, 'id' | 'level' | 'rarity' | 'options'>[] = [

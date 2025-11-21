@@ -12,12 +12,11 @@ const ITEM_SIZE = 30;
 const SPEED = 5;
 
 // AI Constants
-const AGGRO_RANGE = 220; // Reduced from 300 for smaller activity range
-const LEASH_RANGE = 350; // Reduced from 500 for smaller activity range
-const GRID_SIZE = 400; // Size of a "Zone"
+const AGGRO_RANGE = 220; 
+const LEASH_RANGE = 350;
+const GRID_SIZE = 400; 
 
 // --- Stat Helper (Level Scaling) ---
-// Returns the value increased by 10% per level
 const getScaledStat = (baseVal: number | undefined, level: number) => {
     if (!baseVal) return 0;
     return Math.ceil(baseVal * (1 + level * 0.1));
@@ -49,7 +48,6 @@ const playDropSound = () => {
 };
 
 // --- Helper: Loot Generation ---
-
 const generateLoot = (monsterLevel: number, isElite: boolean, minRarity?: Rarity): Item | null => {
   let dropChance = 0.4;
   if (isElite) dropChance = 0.8;
@@ -157,7 +155,6 @@ const calculateStats = (player: Player) => {
   items.forEach(item => {
     if (!item) return;
     
-    // Apply Level Scaling (10% per level)
     const scaledMin = getScaledStat(item.stats.minDmg, item.level);
     const scaledMax = getScaledStat(item.stats.maxDmg, item.level);
     const scaledDef = getScaledStat(item.stats.defense, item.level);
@@ -213,31 +210,27 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
   const cx = TOWN_CENTER_X;
   const cy = TOWN_CENTER_Y;
   
-  // Lorencia Special Layout (Map 0)
+  // Lorencia (Map 0)
   if (mapId === 0) {
       const tw = TOWN_WIDTH;
       const th = TOWN_HEIGHT;
       const wallThick = 20;
       const bridgeW = 80;
       const bridgeH = 80;
-      const gap = 80; // Gap for gates
+      const gap = 80; 
 
-      // 1. The Moat
       decorations.push({ id: 'moat-t', type: 'river', x: cx - tw/2 - 60, y: cy - th/2 - 60, w: tw + 120, h: 50 });
       decorations.push({ id: 'moat-b', type: 'river', x: cx - tw/2 - 60, y: cy + th/2 + 10, w: tw + 120, h: 50 });
       decorations.push({ id: 'moat-l', type: 'river', x: cx - tw/2 - 60, y: cy - th/2 - 10, w: 50, h: th + 20 });
       decorations.push({ id: 'moat-r', type: 'river', x: cx + tw/2 + 10, y: cy - th/2 - 10, w: 50, h: th + 20 });
 
-      // 2. Bridges
       decorations.push({ id: 'bridge-w', type: 'pavement', x: cx - tw/2 - 65, y: cy - bridgeH/2, w: 80, h: bridgeH, style: { zIndex: 1 } });
       decorations.push({ id: 'bridge-e', type: 'pavement', x: cx + tw/2 - 15, y: cy - bridgeH/2, w: 80, h: bridgeH, style: { zIndex: 1 } });
       decorations.push({ id: 'bridge-n', type: 'pavement', x: cx - bridgeW/2, y: cy - th/2 - 65, w: bridgeW, h: 80, style: { zIndex: 1 } });
       decorations.push({ id: 'bridge-s', type: 'pavement', x: cx - bridgeW/2, y: cy + th/2 - 15, w: bridgeW, h: 80, style: { zIndex: 1 } });
 
-      // 3. Floor
       decorations.push({ id: 'plaza-floor', type: 'pavement', x: cx - tw/2, y: cy - th/2, w: tw, h: th });
 
-      // 4. Walls
       decorations.push({ id: 'wall-t-l', type: 'wall', x: cx - tw/2, y: cy - th/2, w: tw/2 - gap/2, h: wallThick });
       decorations.push({ id: 'wall-t-r', type: 'wall', x: cx + gap/2, y: cy - th/2, w: tw/2 - gap/2, h: wallThick });
       decorations.push({ id: 'wall-b-l', type: 'wall', x: cx - tw/2, y: cy + th/2 - wallThick, w: tw/2 - gap/2, h: wallThick });
@@ -247,16 +240,13 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
       decorations.push({ id: 'wall-r-t', type: 'wall', x: cx + tw/2 - wallThick, y: cy - th/2, w: wallThick, h: th/2 - gap/2 });
       decorations.push({ id: 'wall-r-b', type: 'wall', x: cx + tw/2 - wallThick, y: cy + gap/2, w: wallThick, h: th/2 - gap/2 });
 
-      // 5. Buildings
       decorations.push({ id: 'building-bar', type: 'roof', x: cx - tw/2 + 30, y: cy - th/2 + 30, w: 120, h: 80 });
       decorations.push({ id: 'building-bar-sign', type: 'stone', x: cx - tw/2 + 80, y: cy - th/2 + 110, w: 20, h: 20 });
       decorations.push({ id: 'building-vault', type: 'roof', x: cx + tw/2 - 140, y: cy - th/2 + 30, w: 100, h: 100 });
       
-      // 6. Fountain
       decorations.push({ id: 'fountain-base', type: 'stone', x: cx - 30, y: cy - 30, w: 60, h: 60, style: { borderRadius: '50%' } });
       decorations.push({ id: 'fountain-water', type: 'fountain', x: cx - 20, y: cy - 20, w: 40, h: 40 });
 
-      // 7. Trees (Outside)
       for (let i=0; i<200; i++) {
           const tx = Math.random() * WORLD_WIDTH;
           const ty = Math.random() * WORLD_HEIGHT;
@@ -266,9 +256,8 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
       return decorations;
   }
 
-  // Noria Special Layout (Map 1)
+  // Noria (Map 1)
   if (mapId === 1) {
-      // Central Crystal & Plaza
       decorations.push({ id: 'noria-crystal', type: 'crystal', x: cx - 30, y: cy - 30, w: 60, h: 60 });
       decorations.push({ 
           id: 'noria-plaza', 
@@ -277,55 +266,94 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
           style: { borderRadius: '50%', zIndex: 0 } 
       });
 
-      // Radiating Paths (Sand)
-      // 1. East Exit
       decorations.push({ id: 'path-e', type: 'sand', x: cx + 200, y: cy - 60, w: 1800, h: 120 });
-      // 2. West (curving)
       decorations.push({ id: 'path-w', type: 'sand', x: cx - 2000, y: cy - 60, w: 1800, h: 120 });
-      // 3. North East (Rotated)
       decorations.push({ id: 'path-ne', type: 'sand', x: cx, y: cy - 60, w: 1500, h: 120, style: { transform: 'rotate(-45deg)', transformOrigin: '0 50%' } });
-      // 4. South East (Rotated)
       decorations.push({ id: 'path-se', type: 'sand', x: cx, y: cy - 60, w: 1500, h: 120, style: { transform: 'rotate(45deg)', transformOrigin: '0 50%' } });
 
-      // Dense Forest
       for (let i=0; i<600; i++) {
           const tx = Math.random() * WORLD_WIDTH;
           const ty = Math.random() * WORLD_HEIGHT;
-          
-          // Distance check from center (Safe Zone)
           const dx = tx - cx;
           const dy = ty - cy;
           const dist = Math.sqrt(dx*dx + dy*dy);
           
-          if (dist < 380) continue; // Leave plaza clear
-
-          // Keep paths clear (Rough approximation)
-          if (Math.abs(ty - cy) < 80 && tx > cx) continue; // East
-          if (Math.abs(ty - cy) < 80 && tx < cx) continue; // West
-          
-          // Diagonals (approximate check)
+          if (dist < 380) continue; 
+          if (Math.abs(ty - cy) < 80 && tx > cx) continue; 
+          if (Math.abs(ty - cy) < 80 && tx < cx) continue; 
           const relX = tx - cx;
           const relY = ty - cy;
-          // NE Band
           if (relX > 0 && relY < 0 && Math.abs(relX + relY) < 100) continue;
-          // SE Band
           if (relX > 0 && relY > 0 && Math.abs(relX - relY) < 100) continue;
 
           decorations.push({ id: `noria-tree-${i}`, type: 'tree', x: tx, y: ty, w: 60, h: 80 });
       }
 
-      // Some random magical stones
       for (let i=0; i<50; i++) {
          const sx = Math.random() * WORLD_WIDTH;
          const sy = Math.random() * WORLD_HEIGHT;
          if (Math.sqrt(Math.pow(sx-cx,2) + Math.pow(sy-cy,2)) < 400) continue;
          decorations.push({ id: `magic-stone-${i}`, type: 'stone', x: sx, y: sy, w: 30, h: 30, style: { filter: 'hue-rotate(90deg)' } });
       }
-      
       return decorations;
   }
 
-  // Other Maps
+  // Devias (Map 2) - Custom Layout based on Bottom Left Safe Zone
+  if (mapId === 2) {
+      // Safe Zone: Bottom Left [0-1000, 3000-4000]
+      decorations.push({ id: 'safe-zone-floor', type: 'pavement', x: 0, y: 3200, w: 1000, h: 800, style: { backgroundColor: '#cbd5e1' } });
+      decorations.push({ id: 'safe-zone-wall-r', type: 'wall', x: 1000, y: 3200, w: 40, h: 800, style: { backgroundColor: '#64748b' } });
+      decorations.push({ id: 'safe-zone-wall-t', type: 'wall', x: 0, y: 3200, w: 800, h: 40, style: { backgroundColor: '#64748b' } });
+      // Exit Gate
+      decorations.push({ id: 'gate-arch', type: 'stone', x: 800, y: 3160, w: 40, h: 80 }); // Decorative pillar
+
+      // Main Path going North-East
+      // Path 1: Exit to Field 1
+      decorations.push({ id: 'path-main-1', type: 'pavement', x: 800, y: 2800, w: 400, h: 400, style: { backgroundColor: '#f1f5f9' } });
+      
+      // Central Hub
+      decorations.push({ id: 'hub-floor', type: 'pavement', x: 1000, y: 2000, w: 800, h: 800, style: { backgroundColor: '#e2e8f0' } });
+
+      // Right Branch (Yeti Zone)
+      decorations.push({ id: 'bridge-right', type: 'pavement', x: 1800, y: 2200, w: 400, h: 200, style: { backgroundColor: '#94a3b8' } });
+      decorations.push({ id: 'room-right', type: 'pavement', x: 2200, y: 1800, w: 1000, h: 1000, style: { backgroundColor: '#f8fafc' } });
+
+      // Top Path (To Boss)
+      decorations.push({ id: 'path-boss', type: 'pavement', x: 1400, y: 1000, w: 400, h: 1000, style: { backgroundColor: '#cbd5e1' } });
+      decorations.push({ id: 'room-boss', type: 'pavement', x: 1400, y: 0, w: 1200, h: 1000, style: { backgroundColor: '#eff6ff' } });
+
+      // Walls outlining the playable area (Visual only, no collision enforced in this simple version)
+      // Just some scattered walls to imply structure
+      decorations.push({ id: 'wall-decor-1', type: 'wall', x: 1200, y: 1800, w: 20, h: 200 });
+      decorations.push({ id: 'wall-decor-2', type: 'wall', x: 1600, y: 1800, w: 20, h: 200 });
+
+      // Random Decorations (Snow, Crystals)
+      for (let i = 0; i < 500; i++) {
+          const rx = Math.random() * WORLD_WIDTH;
+          const ry = Math.random() * WORLD_HEIGHT;
+          
+          // Simple check to place items mostly outside the predefined paths to look like "wild"
+          const inSafe = rx < 1000 && ry > 3200;
+          const inHub = rx > 1000 && rx < 1800 && ry > 2000 && ry < 2800;
+          const inBoss = rx > 1400 && rx < 2600 && ry < 1000;
+          
+          if (inSafe || inHub || inBoss) continue; 
+
+          const type = Math.random() > 0.8 ? 'stone' : 'snow';
+          decorations.push({ 
+              id: `devias-dec-${i}`, 
+              type, 
+              x: rx, 
+              y: ry, 
+              w: type === 'stone' ? 40 : 60, 
+              h: type === 'stone' ? 40 : 60,
+              style: { opacity: 0.7 } 
+          });
+      }
+      return decorations;
+  }
+
+  // Generic Maps
   for (let i = 0; i < WORLD_WIDTH; i += 40) {
     if (i > SAFE_ZONE_WIDTH + 100) { 
         const riverY = (WORLD_HEIGHT / 2) + Math.sin(i / 200) * 300;
@@ -340,15 +368,14 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
     }
   }
 
-  const numObjects = 300; // Increased density
+  const numObjects = 300; 
   for (let i = 0; i < numObjects; i++) {
     const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
-    // Safe zone check for generic maps
     if (mapId !== 0 && mapId !== 1 && x < SAFE_ZONE_WIDTH && y < SAFE_ZONE_HEIGHT) continue;
 
     let type: MapDecoration['type'] = 'tree';
-    if (mapId === 2) type = Math.random() > 0.5 ? 'snow' : 'stone';
+    if (mapId === 3) type = 'stone';
     else if (mapId === 4) type = 'stone';
     else if (mapId === 5) type = 'cloud';
     else type = Math.random() > 0.6 ? 'stone' : 'tree';
@@ -363,7 +390,6 @@ const generateMapDecorations = (mapId: number): MapDecoration[] => {
     });
   }
   
-  // Ground details
   for (let i=0; i < 400; i++) {
      const x = Math.random() * WORLD_WIDTH;
     const y = Math.random() * WORLD_HEIGHT;
@@ -556,7 +582,6 @@ export default function App() {
   const [isAttacking, setIsAttacking] = useState(false);
   const [mapDecorations, setMapDecorations] = useState<MapDecoration[]>([]);
   
-  // Camera and Zoom State
   const [cameraOffset, setCameraOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isDraggingMap, setIsDraggingMap] = useState(false);
@@ -578,6 +603,9 @@ export default function App() {
       if (mapId === 0) {
           return { x: TOWN_CENTER_X - TOWN_WIDTH/2, y: TOWN_CENTER_Y - TOWN_HEIGHT/2, w: TOWN_WIDTH, h: TOWN_HEIGHT };
       }
+      if (mapId === 2) { // Devias Safe Zone (Bottom Left)
+          return { x: 0, y: 3200, w: 1000, h: 800 };
+      }
       return { x: 0, y: 0, w: SAFE_ZONE_WIDTH, h: SAFE_ZONE_HEIGHT };
   }, []);
 
@@ -593,6 +621,10 @@ export default function App() {
           const dy = y - TOWN_CENTER_Y;
           return (dx*dx + dy*dy) < (350 * 350);
       }
+      // Devias (Bottom Left)
+      if (mapId === 2) {
+          return x >= 0 && x <= 1000 && y >= 3200 && y <= 4000;
+      }
       // Default (Top Left)
       const rect = getSafeZoneRect(mapId);
       return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
@@ -601,52 +633,135 @@ export default function App() {
   // Zone-Based Monster Generation
   const generateFixedMonsters = useCallback((mapId: number) => {
     const map = MAPS[mapId];
-    // Get potential monsters for this map
-    const validMonsters = MONSTERS_DB.filter(m => m.level >= map.minLvl);
-    if (validMonsters.length === 0) return [];
-
     const newMonsters: Monster[] = [];
     const cols = Math.floor(WORLD_WIDTH / GRID_SIZE);
     const rows = Math.floor(WORLD_HEIGHT / GRID_SIZE);
+
+    // Devias Special Spawning Logic
+    if (mapId === 2) {
+        const worms = MONSTERS_DB.find(m => m.name === '雪虫');
+        const iceMonster = MONSTERS_DB.find(m => m.name === '寒冰魔');
+        const assassin = MONSTERS_DB.find(m => m.name === '暗杀者');
+        const yeti = MONSTERS_DB.find(m => m.name === '雪人');
+        const eliteYeti = MONSTERS_DB.find(m => m.name === '雪人王'); // Visually distinct but same ID base
+        const iceQueen = MONSTERS_DB.find(m => m.name === '冰后');
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const gridX = c * GRID_SIZE;
+                const gridY = r * GRID_SIZE;
+                if (isSafeZone(gridX + GRID_SIZE/2, gridY + GRID_SIZE/2, mapId)) continue;
+
+                let template: any = worms;
+                let count = 0;
+
+                // Determine Zone based on coordinates
+                // Town is Bottom Left (0, 4000). 
+                // Distance from safe zone exit roughly (1000, 3200)
+                
+                // Zone 1: Near Town (Worms)
+                if (gridX < 2000 && gridY > 2000) {
+                    template = worms;
+                    count = Math.random() < 0.7 ? 2 : 1;
+                }
+                // Zone 2: Middle / Central Hub (Ice Monsters, Assassins)
+                else if (gridX < 2500 && gridY > 1000 && gridY <= 2000) {
+                    template = Math.random() > 0.5 ? iceMonster : assassin;
+                    count = Math.random() < 0.6 ? 2 : 1;
+                }
+                // Zone 3: Right Side (Yetis)
+                else if (gridX >= 2000 && gridY > 1500) {
+                    template = yeti;
+                    count = Math.random() < 0.5 ? 2 : 1;
+                }
+                // Zone 4: Top Right (Ice Queen / Elite Area)
+                else if (gridX >= 2000 && gridY <= 1500) {
+                    // Small chance for Ice Queen in specific grid, else Elite Yetis
+                    if (gridX > 3000 && gridY < 800 && Math.random() < 0.3) { // Boss room
+                         template = iceQueen;
+                         count = 1;
+                    } else {
+                         template = Math.random() < 0.3 ? eliteYeti : yeti;
+                         count = 1;
+                    }
+                }
+                // Fillers
+                else {
+                    template = worms;
+                    count = Math.random() < 0.3 ? 1 : 0;
+                }
+
+                if (!template) continue;
+
+                for (let i = 0; i < count; i++) {
+                    const isBoss = template.name === '冰后';
+                    const isElite = !isBoss && (template.name === '雪人王' || Math.random() < 0.05);
+                    
+                    // If template was normal yeti but became elite, rename
+                    let name = template.name;
+                    if (isElite && template.name === '雪人') name = '雪人王'; 
+
+                    const scaleFactor = 1;
+                    const hp = isBoss ? template.maxHp : isElite ? template.maxHp * 2 : template.maxHp;
+                    const sizeScale = isBoss ? 2.0 : isElite ? 1.3 : 1;
+
+                    const spawnX = gridX + Math.random() * (GRID_SIZE - 40);
+                    const spawnY = gridY + Math.random() * (GRID_SIZE - 40);
+
+                    if (isSafeZone(spawnX, spawnY, mapId)) continue;
+
+                    newMonsters.push({
+                        ...template,
+                        id: Math.random().toString(),
+                        name: name,
+                        hp: Math.floor(hp),
+                        maxHp: Math.floor(hp),
+                        minDmg: template.minDmg,
+                        maxDmg: template.maxDmg,
+                        exp: template.exp * (isElite ? 2 : 1) * (isBoss ? 5 : 1),
+                        isElite: isElite,
+                        isBoss: isBoss,
+                        x: spawnX,
+                        y: spawnY,
+                        width: MONSTER_SIZE * sizeScale,
+                        height: MONSTER_SIZE * sizeScale,
+                        lastAttack: 0,
+                        originX: spawnX,
+                        originY: spawnY
+                    });
+                }
+            }
+        }
+        return newMonsters;
+    }
+
+    // Default Logic for other maps
+    const validMonsters = MONSTERS_DB.filter(m => m.level >= map.minLvl);
+    if (validMonsters.length === 0) return [];
 
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const gridX = c * GRID_SIZE;
             const gridY = r * GRID_SIZE;
-
-            // Skip if grid is substantially inside Safe Zone
             if (isSafeZone(gridX + GRID_SIZE/2, gridY + GRID_SIZE/2, mapId)) continue;
 
-            // Pick one monster type for this zone
             const template = validMonsters[Math.floor(Math.random() * validMonsters.length)];
-            
-            // Spawn 0-2 monsters per grid (approx 80-150 per map)
-            // 20% chance for 0, 40% for 1, 40% for 2
             const rand = Math.random();
             const count = rand < 0.2 ? 0 : (rand < 0.6 ? 1 : 2);
             
             for (let i = 0; i < count; i++) {
-                const isBoss = Math.random() < 0.005; // Rare per grid
+                const isBoss = Math.random() < 0.005;
                 const isElite = !isBoss && Math.random() < 0.08;
 
                 const scaleFactor = 1 + (map.minLvl * 0.02);
                 const baseHp = template.maxHp * scaleFactor;
-                const baseMin = template.minDmg * scaleFactor;
-                const baseMax = template.maxDmg * scaleFactor;
-                const baseExp = template.exp * scaleFactor;
-     
-                const hp = isBoss ? baseHp * 8 : isElite ? baseHp * 2 : baseHp;
-                const minDmg = isBoss ? baseMin * 2 : isElite ? baseMin * 1.5 : baseMin;
-                const maxDmg = isBoss ? baseMax * 2 : isElite ? baseMax * 1.5 : baseMax;
-                const exp = isBoss ? baseExp * 15 : isElite ? baseExp * 3 : baseExp;
                 
+                const hp = isBoss ? baseHp * 8 : isElite ? baseHp * 2 : baseHp;
                 const sizeScale = isBoss ? 2.5 : isElite ? 1.5 : 1;
 
-                // Random pos within grid
                 const spawnX = gridX + Math.random() * (GRID_SIZE - 40);
                 const spawnY = gridY + Math.random() * (GRID_SIZE - 40);
 
-                // Ensure monster doesn't spawn in safe zone
                 if (isSafeZone(spawnX, spawnY, mapId)) continue;
 
                 newMonsters.push({
@@ -655,9 +770,9 @@ export default function App() {
                     name: isBoss ? `世界BOSS ${template.name}` : isElite ? `精英 ${template.name}` : template.name,
                     hp: Math.floor(hp),
                     maxHp: Math.floor(hp),
-                    minDmg: Math.floor(minDmg),
-                    maxDmg: Math.floor(maxDmg),
-                    exp: Math.floor(exp),
+                    minDmg: Math.floor(template.minDmg * scaleFactor),
+                    maxDmg: Math.floor(template.maxDmg * scaleFactor),
+                    exp: Math.floor(template.exp * scaleFactor),
                     isElite: isElite,
                     isBoss: isBoss,
                     x: spawnX,
@@ -773,8 +888,8 @@ export default function App() {
 
   const initializePlayer = (cls: ClassType, name: string) => {
     const base = INITIAL_STATS[cls];
-    const startX = activeMap === 0 ? TOWN_CENTER_X : SAFE_ZONE_WIDTH / 2;
-    const startY = activeMap === 0 ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT / 2;
+    const startX = activeMap === 0 ? TOWN_CENTER_X : (activeMap === 2 ? 400 : SAFE_ZONE_WIDTH / 2);
+    const startY = activeMap === 0 ? TOWN_CENTER_Y : (activeMap === 2 ? 3600 : SAFE_ZONE_HEIGHT / 2);
     
     const newPlayer: Player = {
       id: 'player-1',
@@ -799,7 +914,7 @@ export default function App() {
     };
     setPlayer(newPlayer);
     setGameState('PLAYING');
-    setMonsters([]); // Cleared initially, useEffect triggers generation
+    setMonsters([]); 
     setGroundItems([]);
     setCameraOffset({ x: 0, y: 0 });
     addLog(`欢迎来到奇迹MU, ${name}!`, 'info');
@@ -865,28 +980,22 @@ export default function App() {
            let newX = m.x;
            let newY = m.y;
            
-           // State 1: Aggro (Chase Player)
-           // Condition: Player nearby AND not Leashed AND Player not in safe zone
            if (distToPlayer < AGGRO_RANGE && distToOrigin < LEASH_RANGE && !playerInSafe) {
                const speed = m.isBoss ? 1.5 : m.isElite ? 2.5 : 2;
                const dx = player.x - m.x;
                const dy = player.y - m.y;
-               // Normalize vector
                const vx = (dx / distToPlayer) * speed;
                const vy = (dy / distToPlayer) * speed;
                
                const nextX = m.x + vx;
                const nextY = m.y + vy;
                
-               // Check collision with safe zone
                if (!isSafeZone(nextX, nextY, activeMap)) {
                    newX = nextX;
                    newY = nextY;
                }
            } 
-           // State 2: Return to Origin (Leashed or Player ran away)
            else if (distToOrigin > 10) {
-               // Return slowly
                const returnSpeed = 2;
                const dx = m.originX - m.x;
                const dy = m.originY - m.y;
@@ -894,12 +1003,7 @@ export default function App() {
                newX = m.x + (dx / dist) * returnSpeed;
                newY = m.y + (dy / dist) * returnSpeed;
            }
-           // State 3: Idle (At origin) - No movement or slight wobble
-           else {
-               // Optional: add tiny wobble here if desired, but "don't move" was requested
-           }
 
-           // Attack Logic
            if (distToPlayer < (50 * (m.isBoss ? 1.5 : 1)) && now - m.lastAttack > 2000 && !playerInSafe) {
              setPlayer(p => {
                 if (!p) return null;
@@ -913,8 +1017,8 @@ export default function App() {
                 
                 if (p.hp - dmg <= 0) {
                   addLog("你死亡了! 重生中...", "error");
-                  const respawnX = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_X : SAFE_ZONE_WIDTH/2;
-                  const respawnY = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT/2;
+                  const respawnX = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_X : (activeMap === 2 ? 400 : SAFE_ZONE_WIDTH/2);
+                  const respawnY = (activeMap === 0 || activeMap === 1) ? TOWN_CENTER_Y : (activeMap === 2 ? 3600 : SAFE_ZONE_HEIGHT/2);
                   return { ...p, hp: p.maxHp, x: respawnX, y: respawnY };
                 }
                 return { ...p, hp: p.hp - dmg };
@@ -934,15 +1038,13 @@ export default function App() {
               const spawnedMobs: Monster[] = readyToSpawn.map(task => ({
                   ...task,
                   id: Math.random().toString(),
-                  hp: task.maxHp, // Full HP on respawn
-                  x: task.originX, // Reset to origin
+                  hp: task.maxHp,
+                  x: task.originX,
                   y: task.originY,
                   lastAttack: 0,
-                  // No respawnTime on live monster
               }));
               
               setMonsters(prev => [...prev, ...spawnedMobs]);
-              // Optional: addLog(`Map Entity Respawned (${spawnedMobs.length})`, 'info');
           }
           return pending;
       });
@@ -1026,7 +1128,7 @@ export default function App() {
 
          if (m.hp - totalDmg <= 0) {
            handleMonsterKill(m, stats);
-           return null; // Remove from active list, handled in handleMonsterKill
+           return null; 
          }
          return { ...m, hp: m.hp - totalDmg };
        }
@@ -1090,8 +1192,7 @@ export default function App() {
         if (drop.type === ItemType.JEWEL || drop.rarity === Rarity.GOLD) playDropSound();
     });
 
-    // Queue Respawn
-    const respawnDelay = 3000 + Math.random() * 7000; // 3 to 10 seconds
+    const respawnDelay = 3000 + Math.random() * 7000; 
     const { id, ...monsterData } = m;
     setRespawnQueue(prev => [...prev, { ...monsterData, respawnTime: Date.now() + respawnDelay }]);
   };
@@ -1197,7 +1298,6 @@ export default function App() {
   const viewX = (window.innerWidth / 2) - cameraOffset.x - (player.x * zoom);
   const viewY = (window.innerHeight / 2) - cameraOffset.y - (player.y * zoom);
   
-  // Only render visible entities (Optimization)
   const visibleMonsters = monsters.filter(m => {
       const screenX = viewX + m.x * zoom;
       const screenY = viewY + m.y * zoom;
@@ -1223,7 +1323,6 @@ export default function App() {
          </div>
       </div>
 
-      {/* Main Game Viewport */}
       <div 
         className="flex-1 relative overflow-hidden bg-black cursor-crosshair select-none"
         onMouseDown={handleMapMouseDown}
@@ -1232,11 +1331,9 @@ export default function App() {
         onMouseLeave={handleMapMouseUp}
         onWheel={handleWheel}
       >
-         {/* Static Overlay Effects */}
          <div className="map-vignette z-10" />
          <div className="absolute inset-0 opacity-10 pointer-events-none z-[1] mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
 
-         {/* Transformed World Container */}
          <div 
             className="absolute top-0 left-0"
             style={{ 
@@ -1250,9 +1347,8 @@ export default function App() {
              <div className={`absolute inset-0 ${mapClass}`} />
              
              {mapDecorations.map(dec => {
-                 // Viewport culling for decorations could be added here for extra performance
                  if (dec.type === 'pavement') return <div key={dec.id} className="absolute bg-pavement border-2 border-gray-700 z-[1] shadow-inner" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, ...dec.style }}></div>
-                 if (dec.type === 'wall') return <div key={dec.id} className="absolute bg-wall border border-black z-[2] shadow-xl" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
+                 if (dec.type === 'wall') return <div key={dec.id} className="absolute bg-wall border border-black z-[2] shadow-xl" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h, ...dec.style }}></div>
                  if (dec.type === 'roof') return <div key={dec.id} className="absolute bg-roof border-4 border-gray-800 z-[3] shadow-2xl flex items-center justify-center" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}><div className="w-[90%] h-[90%] border border-gray-600/30"></div></div>
                  if (dec.type === 'fountain') return <div key={dec.id} className="absolute fountain-water rounded-full blur-sm z-[2] border-4 border-white/20" style={{ left: dec.x, top: dec.y, width: dec.w, height: dec.h }}></div>
                  
@@ -1269,8 +1365,7 @@ export default function App() {
                  return null;
              })}
              
-             {/* Safe Zone Indicator for Maps 0, 1 or standard safe zone */}
-             {(activeMap !== 0 && activeMap !== 1) ? (
+             {(activeMap !== 0 && activeMap !== 1 && activeMap !== 2) ? (
                 <div className="absolute top-0 left-0 safe-zone-dome flex items-center justify-center z-0" style={{ width: SAFE_ZONE_WIDTH, height: SAFE_ZONE_HEIGHT }}>
                     <div className="text-blue-400/20 font-bold text-4xl -rotate-45 select-none border-4 border-blue-500/20 p-4 rounded-xl">安全区</div>
                 </div>
@@ -1278,10 +1373,12 @@ export default function App() {
                  <div className="absolute safe-zone-dome flex items-center justify-center z-0" 
                       style={ activeMap === 0 ? 
                         { left: TOWN_CENTER_X - TOWN_WIDTH/2, top: TOWN_CENTER_Y - TOWN_HEIGHT/2, width: TOWN_WIDTH, height: TOWN_HEIGHT } :
-                        { left: TOWN_CENTER_X - 350, top: TOWN_CENTER_Y - 350, width: 700, height: 700, borderRadius: '50%' }
+                        (activeMap === 1 ? 
+                            { left: TOWN_CENTER_X - 350, top: TOWN_CENTER_Y - 350, width: 700, height: 700, borderRadius: '50%' } :
+                            { left: 0, top: 3200, width: 1000, height: 800 } // Map 2 Devias Safe Zone
+                        )
                       }
                  >
-                    {/* Safe zone visual only */}
                  </div>
              )}
 
@@ -1296,8 +1393,13 @@ export default function App() {
                       <div className="text-green-300/40 font-bold text-2xl select-none mu-font">仙踪林</div>
                  </div>
              )}
+             
+             {activeMap === 2 && (
+                 <div className="absolute text-center z-[1] pointer-events-none" style={{ left: 400, top: 3500 }}>
+                      <div className="text-blue-300/40 font-bold text-2xl select-none mu-font">冰风谷</div>
+                 </div>
+             )}
 
-             {/* Entities Layer */}
              <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
                 {visibleGroundItems.map(item => (
                   <div key={item.id} className="absolute flex flex-col items-center justify-center pointer-events-auto cursor-pointer hover:scale-110 transition-transform z-[3]" style={{ left: item.x, top: item.y, width: ITEM_SIZE, height: ITEM_SIZE }} onClick={(e) => { e.stopPropagation(); pickUpItem(item); }} onMouseEnter={(e) => setHoveredItem({ item, x: e.clientX, y: e.clientY, location: 'GROUND' })} onMouseLeave={() => setHoveredItem(null)}>
@@ -1453,9 +1555,8 @@ export default function App() {
                   setActiveMap(i); 
                   setOpenMenu(null);
                   
-                  // Teleport to Map Center/Safe Zone
-                  const newX = (i === 0 || i === 1) ? TOWN_CENTER_X : SAFE_ZONE_WIDTH / 2;
-                  const newY = (i === 0 || i === 1) ? TOWN_CENTER_Y : SAFE_ZONE_HEIGHT / 2;
+                  const newX = (i === 0 || i === 1) ? TOWN_CENTER_X : (i === 2 ? 400 : SAFE_ZONE_WIDTH / 2);
+                  const newY = (i === 0 || i === 1) ? TOWN_CENTER_Y : (i === 2 ? 3600 : SAFE_ZONE_HEIGHT / 2);
                   setPlayer(prev => prev ? ({ ...prev, x: newX, y: newY }) : null);
                   setCameraOffset({ x: 0, y: 0 });
 
